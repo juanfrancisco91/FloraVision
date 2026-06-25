@@ -5,7 +5,7 @@ import numpy as np
 
 
 script = Path(__file__).resolve().parent
-ruta = os.path.join(script, 'imagenes_prueba/imagen_prueba.jpg')
+ruta = os.path.join(script, 'imagenes_prueba/rosa_roja.jpg')
 img = cv.imread(ruta)
 
 if img is None:
@@ -14,11 +14,14 @@ else:
     img_hsv = cv.cvtColor(img ,cv.COLOR_BGR2HSV)
     cv.imshow('Origen', img)
     cv.imshow('HSV BASE', img_hsv)
-    azul_bajo =  np.array([170, 50, 50])
-    azul_alto = np.array([179, 255, 255])
+    azul_bajo =  np.array([0, 50, 50])
+    azul_alto = np.array([10, 255, 255])
     mod = cv.inRange(img_hsv, azul_bajo, azul_alto)
     mod = cv.bitwise_and(img, img, mask=mod)
+    mod_rojo = cv.inRange(img_hsv, azul_bajo, azul_alto)
+    mod_rojo = cv.bitwise_or(img,img,mask=mod_rojo)
     cv.imshow('Modificada', mod)
+    cv.imshow('ROJA', mod_rojo)
     cv.waitKey(0)
     cv.destroyAllWindows()
 
