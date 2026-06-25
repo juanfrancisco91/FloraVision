@@ -1,9 +1,12 @@
 import cv2 as cv
+import time
 
 def captura_vid():
-    camara = cv.VideoCapture(0)
-    l = []
+    camara = cv.VideoCapture(1, cv.CAP_MSMF)
+    fotogramas = []
 
+    time.sleep(3)
+    
     if not camara.isOpened():
         print("No se pudo abrir la Camara")
         exit()
@@ -21,12 +24,4 @@ def captura_vid():
     camara.release()
     cv.destroyAllWindows()
 
-    return l
-a=0
-l = captura_vid()
-for i in l:
-    a+=1
-    cv.imshow('preuba', i)
-    cv.imwrite(f'{a}.jpg',i)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return fotogramas
