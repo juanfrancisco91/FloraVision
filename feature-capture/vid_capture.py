@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 def captura_vid():
-    camara = cv.VideoCapture(0, cv.CAP_MSMF)
+    camara = cv.VideoCapture(1, cv.CAP_MSMF)
     fotogramas = []
 
     #time.sleep(3)
@@ -21,6 +21,7 @@ def captura_vid():
         rango = cv.inRange(frame_color,marron_bajo,marron_alto)
         mascara = cv.bitwise_and(frame,frame, mask=rango)
         cv.imshow('Camara_1', mascara)
+        #cv.imshow('camara2', frame)
         
         if cv.waitKey(1) & 0xFF == ord('`'):
             break
@@ -29,4 +30,4 @@ def captura_vid():
     camara.release()
     cv.destroyAllWindows()
 
-l= captura_vid()
+l = captura_vid()
