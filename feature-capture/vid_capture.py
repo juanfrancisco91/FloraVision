@@ -49,7 +49,8 @@ def captura_vid():
         # Deteccion de mascar marron
         marron_gris = cv.cvtColor(mascara, cv.COLOR_HSV2BGR)
         marron_gris = cv.cvtColor(marron_gris, cv.COLOR_BGR2GRAY)
-        _, marron_binaria = cv.threshold(marron_gris,68,255, cv.THRESH_BINARY)
+        marron_canny = cv.Canny(marron_gris, 30, 200)
+        _, marron_binaria = cv.threshold(marron_canny,60,255, cv.THRESH_BINARY)
         contornos_m, jerarquia_m = cv.findContours(marron_binaria, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
         copia_marron = mascara.copy()
         mascara_marron = cv.drawContours(copia_marron, contornos_m, -1, (0,255,0),1)
