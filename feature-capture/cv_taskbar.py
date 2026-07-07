@@ -48,6 +48,7 @@ while True:
     mascara_gris = cv.drawContours(resultado, contornos_g, -1, (0,255,0),1)
 
     
+    
     umbral = 50
 
     area = frame.copy()
