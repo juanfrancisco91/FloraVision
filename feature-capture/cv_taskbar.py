@@ -20,12 +20,15 @@ cv.createTrackbar('V Max', 'Controles', 255,255, nada)
 
 
 cam = cv.VideoCapture(0, cv.CAP_MSMF)
+script = Path(__file__).resolve().parent
+img = os.path.join(script,'imagenes_prueba\girasol.jpg')
+img = cv.imread(img)
 while True:
 
-    ret,frame = cam.read()
+    #ret,frame = cam.read()
 
-    hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
-    gris = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+    gris = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         
     h_min = cv.getTrackbarPos('H Min', 'Controles')
     s_min = cv.getTrackbarPos('S Min', 'Controles')
@@ -39,11 +42,14 @@ while True:
     alto  = np.array([h_max,s_max,v_max])
 
     mascara = cv.inRange(hsv, bajo, alto)
-    resultado = cv.bitwise_and(frame, frame, mask=mascara)
+    resultado = cv.bitwise_and(img, img, mask=mascara)
 
     gris_canny = cv.Canny(resultado, 30, 200)
 
-    _, gris_binaria = cv.threshold(gris_canny,60,255, cv.THRESH_BINARY)        
+    _, contorno_total = cv.threshold(gris, 60, 255, cv.THRESH_BINARY)
+    #contorno_total = cv.bitwise_and(frame, frame, mask=contorno_total)
+
+    _, gris_binaria = cv.threshold(gris_canny,127,255, cv.THRESH_BINARY)        
     contornos_g, jerarquia = cv.findContours(gris_binaria, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     mascara_gris = cv.drawContours(resultado, contornos_g, -1, (0,255,0),1)
 
@@ -51,7 +57,7 @@ while True:
     
     umbral = 50
 
-    area = frame.copy()
+    area = img.copy()
     for c in contornos_g:
         area = cv.contourArea(c)
         
@@ -62,8 +68,9 @@ while True:
 
     cv.imshow('Mascara', mascara)
     cv.imshow('Resultado Filtrado', resultado)
-    cv.imshow('Original', frame)
+    cv.imshow('Original', img)
     cv.imshow('gris_canny', gris_canny)
+    cv.imshow('Contorno completo', contorno_total)
     
     print(f'Area total afectada: {area_total}')
 

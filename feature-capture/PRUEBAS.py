@@ -13,15 +13,13 @@ while True:
     alto = np.array([75, 255, 255])
     bajo = np.array([0, 50, 50])
     
-    mascara_flor = cv.inRange(hsv, bajo, alto)
-    resultado = cv.bitwise_and(frame, frame, mask=mascara_flor)
+    H, S, V = cv.split(hsv)
 
-    _, mascara_flor_completa = cv.threshold(gris, 40,255, cv.THRESH_BINARY) 
-    contorno_total, jerarquia = cv.findContours(mascara_flor_completa, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    cv.drawContours(frame, contorno_total, -1, (255,0,0),1)
+    v_suave = cv.GaussianBlur(V,(7,7),0)
 
-    cv.imshow('Contorno', mascara_flor_completa)
-    cv.imshow('Result',resultado)
+    _, mascara_flor = cv.threshold(v_suave, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    
+    cv.imshow('Tu sabe',mascara_flor)
     cv.waitKey(1)
 
 cam.release()
