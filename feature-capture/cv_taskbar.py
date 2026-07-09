@@ -90,7 +90,7 @@ while True:
     #print(f"bajo = {h_min}, {s_min}, {v_min}")
     #print(f"alto = {h_max}, {s_max}, {v_max}")
 
-    if cv.waitKey(1) & 0xFF == 27:
+    if cv.waitKey(0) & 0xFF == 27:
         print(f"Rango encontrado:")
         print(f"bajo = {h_min}, {s_min}, {v_min}")
         print(f"alto = {h_max}, {s_max}, {v_max}")
