@@ -26,6 +26,9 @@ img = cv.imread(img)
 while True:
 
     #ret,frame = cam.read()
+    
+    frame_total = img
+    frame_danio = img
 
     hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
     gris = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -41,46 +44,51 @@ while True:
     bajo = np.array([h_min, s_min, v_min])
     alto  = np.array([h_max,s_max,v_max])
 
-    mascara = cv.inRange(hsv, bajo, alto)
-    resultado = cv.bitwise_and(img, img, mask=mascara)
+    mascara_sana = cv.inRange(hsv, bajo, alto)
+    resultado = cv.bitwise_and(img, img, mask=mascara_sana)
 
-    gris_canny = cv.Canny(resultado, 30, 200)
+    H,S,V = cv.split(hsv)
+    v_suave = cv.GaussianBlur(V, (7,7),0)
+    
+    _, gris_nueva = cv.threshold(v_suave, 0,255, cv.THRESH_BINARY + cv.THRESH_OTSU)
 
-    _, contorno_total = cv.threshold(gris, 60, 255, cv.THRESH_BINARY)
-    #contorno_total = cv.bitwise_and(frame, frame, mask=contorno_total)
 
-    _, gris_binaria = cv.threshold(gris_canny,127,255, cv.THRESH_BINARY)        
-    contornos_g, jerarquia = cv.findContours(gris_binaria, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-<<<<<<< HEAD
-    mascara_gris = cv.drawContours(resultado, contornos_g, -1, (0,255,0),1)
+    #gris_canny = cv.Canny(resultado, 30, 200)
 
+    kernel = np.ones((5,5), np.uint8)
+    gris_nueva = cv.morphologyEx(gris_nueva, cv.MORPH_CLOSE, kernel)
+    
+
+    #_, gris_binaria = cv.threshold(gris_canny,127,255, cv.THRESH_BINARY)        
+    #contornos_g, jerarquia = cv.findContours(gris_binaria, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    #mascara_gris = cv.drawContours(resultado, contornos_g, -1, (0,255,0),1)
     
     
-    umbral = 50
+    mascara_marchita = cv.bitwise_and(gris_nueva, cv.bitwise_not(mascara_sana))
 
-    area = img.copy()
-    for c in contornos_g:
-        area = cv.contourArea(c)
-        
-        if area > umbral:
-            area_total += area
-            cv.drawContours(resultado, [c], -1,(0,0,255),2)
-=======
->>>>>>> b8b59c5c1a5879b5e85367b1219c51685273a8ca
-    
+    contornos_total, _  = cv.findContours(gris_nueva, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    contornos_marchito, _  = cv.findContours(mascara_marchita, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
     #Funcion para utilizar mas tarde
     #cv.putText(frame, f"Danio {porcentaje_marchito:.1f}", (10,40,)
 
-    cv.imshow('Mascara', mascara)
-    cv.imshow('Resultado Filtrado', resultado)
-    cv.imshow('Original', img)
-    cv.imshow('gris_canny', gris_canny)
-    cv.imshow('Contorno completo', contorno_total)
+    cv.drawContours(frame_total, contornos_total, -1, (0, 255, 0), 2)
+    cv.drawContours(frame_danio, contornos_marchito, -1, (255, 0, 0), 2)
+    
+    #cv.imshow('Mascara', mascara_sana)
+    #cv.imshow('Flor Completa', resultado)
+    #cv.imshow('Original',frame)
+    #cv.imshow('gris_canny', gris_canny)
+    #cv.imshow('Nueva Gris', gris_nueva)
+
+    cv.imshow('1. Mascara Sana (Sliders)', mascara_sana)
+    cv.imshow('2. Molde Flor Completa (Otsu)', frame_total)
+    cv.imshow('3. Marchitamiento Detectado', frame_danio)
     
     #print(f'Area total afectada: {area_total}')
 
-    print(f"bajo = {h_min}, {s_min}, {v_min}")
-    print(f"alto = {h_max}, {s_max}, {v_max}")
+    #print(f"bajo = {h_min}, {s_min}, {v_min}")
+    #print(f"alto = {h_max}, {s_max}, {v_max}")
 
     if cv.waitKey(1) & 0xFF == 27:
         print(f"Rango encontrado:")
