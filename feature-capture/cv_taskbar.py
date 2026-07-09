@@ -45,46 +45,14 @@ while True:
 
     _, gris_binaria = cv.threshold(gris_canny,60,255, cv.THRESH_BINARY)        
     contornos_g, jerarquia = cv.findContours(gris_binaria, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    mascara_gris = cv.drawContours(resultado, contornos_g, -1, (0,255,0),1)
+    
+    #Funcion para utilizar mas tarde
+    #cv.putText(frame, f"Danio {porcentaje_marchito:.1f}", (10,40,)
 
-    # Creacion De silueta completa
-    
-    _, mascara_flor_completa = cv.threshold(gris, 40,255, cv.THRESH_BINARY)
-    
-    # Mascara Sana
-    mascara_sana = cv.inRange(hsv, bajo, alto)
-    
-    mascara_danio_real = cv.bitwise_and(mascara_flor_completa, cv.bitwise_not(mascara_sana))
-    
-    umbral_total = 50
-    umbral_danio = 10
-    
-    
-    contorno_total, _ = cv.findContours(mascara_flor_completa, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    area_total = sum([cv.contourArea(c) for c in contorno_total if cv.contourArea(c) > umbral_total])
-    
-    contorno_danio, _ = cv.findContours(mascara_danio_real, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    area_danio = sum([cv.contourArea(c) for c in contorno_danio if cv.contourArea(c) > umbral_danio])
-
-    if area_total > 0:
-        porcentaje_marchito = (area_danio / area_total) * 100
-    else:
-        porcentaje_marchito= 0
-    
-    cv.putText(frame, f"Danio {porcentaje_marchito:.1f}", (10,40,),
-               cv.FONT_HERSHEY_SIMPLEX, 1,(0,0,255),2)
-    
-    cv.drawContours(frame, contorno_total, -1, (255, 0, 0), 1)
-    cv.drawContours(frame, contorno_danio, -1, (0, 0, 255), 2)
-
-    '''cv.imshow('Mascara', mascara)
+    cv.imshow('Mascara', mascara)
     cv.imshow('Resultado Filtrado', resultado)
     cv.imshow('Original', frame)
-    cv.imshow('gris_canny', gris_canny)'''
-    
-    cv.imshow('Analisis Inverso', frame)
-    cv.imshow('Mascara Danio Aislado', mascara_danio_real)
-    cv.imshow('Mascara completa', mascara_flor_completa)
+    cv.imshow('gris_canny', gris_canny)
     
     #print(f'Area total afectada: {area_total}')
 
