@@ -4,25 +4,23 @@ import os
 import numpy as np
 
 
-script = Path(__file__).resolve().parent
-ruta = os.path.join(script, 'imagenes_prueba/rosa_roja.jpg')
-img = cv.imread(ruta)
+cam = cv.VideoCapture(0, cv.CAP_MSMF)
 
-if img is None:
-    print('No hay nada')
-else:
-    img_hsv = cv.cvtColor(img ,cv.COLOR_BGR2HSV)
-    cv.imshow('Origen', img)
-    cv.imshow('HSV BASE', img_hsv)
-    azul_bajo =  np.array([35, 50, 50])
-    azul_alto = np.array([70, 255, 255])
-    mod = cv.inRange(img_hsv, azul_bajo, azul_alto)
-    mod = cv.bitwise_and(img, img, mask=mod)
-    mod_rojo = cv.inRange(img_hsv, azul_bajo, azul_alto)
-    mod_rojo = cv.bitwise_or(img,img,mask=mod_rojo)
-    cv.imshow('Modificada', mod)
-    cv.imshow('ROJA', mod_rojo)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+while True:
+    
+    ret, frame = cam.read()
+    
+    gris = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+    
+    H,S,V = cv.split(hsv)
+    
+    v_suave = cv.GaussianBlur(V, (7,7), 0)
+    
+    _, mascara_flor = cv.threshold(v_suave, 0,255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    
+    cv.imshow('Tu sabe', mascara_flor)
+    cv.waitKey(1)
 
-
+cam.release()
+cam.destroyAllWindows()
