@@ -6,11 +6,13 @@ import os
 def nada(x):
     pass
 
-# --- INICIALIZACIÓN DE INTERFAZ ---
+# ==========================================
+# 1. INICIALIZACIÓN DE LA INTERFAZ
+# ==========================================
 cv.namedWindow('Controles')
-cv.resizeWindow('Controles', 400, 320)
+cv.resizeWindow('Controles', 400, 350)
 
-# Inicialización de Sliders (Ajustados para arrancar buscando Amarillo de Girasol)
+# Sliders estándar para H, S, V
 cv.createTrackbar('H Min', 'Controles', 15, 179, nada)
 cv.createTrackbar('S Min', 'Controles', 50, 255, nada)
 cv.createTrackbar('V Min', 'Controles', 50, 255, nada)
@@ -18,96 +20,126 @@ cv.createTrackbar('H Max', 'Controles', 35, 179, nada)
 cv.createTrackbar('S Max', 'Controles', 255, 255, nada)
 cv.createTrackbar('V Max', 'Controles', 255, 255, nada)
 
-# --- CARGA DE ASSETS ---
+# Botón virtual (Interruptor) para activar el preset de rosas rojas
+cv.createTrackbar('Preset Rojo', 'Controles', 0, 1, nada)
+
+# ==========================================
+# 2. CARGA DE IMAGEN / PREPARACIÓN
+# ==========================================
 script = Path(__file__).resolve().parent
 ruta_img = os.path.join(script, 'imagenes_prueba', 'roja2.jpg')
 img = cv.imread(ruta_img)
+cam = cv.VideoCapture(0,cv.CAP_MSMF)
+
 
 if img is None:
-    print("Error: No se pudo cargar la imagen del girasol.")
+    print("Error: No se pudo cargar la imagen.")
     exit()
 
-# --- BUCLE PRINCIPAL (Compatible con Video / Frame) ---
+
+# ==========================================
+# 3. BUCLE PRINCIPAL DE PROCESAMIENTO
+# ==========================================
 while True:
-    # NOTA: Si usas video en vivo, descomenta la lectura de la cámara y reemplaza 'img' por 'frame'
-    # ret, frame = cam.read()
-    # if not ret: break
-    # img = frame
-
-    # 1. Copias limpias para dibujar en cada fotograma (Evita que se acumulen líneas)
-    copia_visual_total = img.copy()
-    copia_visual_danio = img.copy()
-
-    # 2. Espacios de Color Bases
-    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
     
-    # 3. Lectura de los Sliders para la PARTE SANA
+    ret, frame = cam.read()
+    
+    # Copias limpias para que no se acumulen los dibujos entre fotogramas
+    copia_visual_total = frame.copy()
+    copia_visual_danio = frame.copy()
+
+    
+
+    
+    # Convertimos a espacio HSV (Matiz, Saturación, Brillo)
+    hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+    
+    # --- A. Lógica del Botón "Preset Rojo" ---
+    if cv.getTrackbarPos('Preset Rojo', 'Controles') == 1:
+        # Movemos los sliders automáticamente a los extremos
+        cv.setTrackbarPos('H Min', 'Controles', 170)
+        cv.setTrackbarPos('H Max', 'Controles', 10)
+        cv.setTrackbarPos('S Min', 'Controles', 50)  
+        cv.setTrackbarPos('V Min', 'Controles', 50)
+        # Devolvemos el interruptor a 0 inmediatamente
+        cv.setTrackbarPos('Preset Rojo', 'Controles', 0)
+        
+    # --- B. Lectura de variables actuales ---
     h_min = cv.getTrackbarPos('H Min', 'Controles')
     s_min = cv.getTrackbarPos('S Min', 'Controles')
     v_min = cv.getTrackbarPos('V Min', 'Controles')
     h_max = cv.getTrackbarPos('H Max', 'Controles')
     s_max = cv.getTrackbarPos('S Max', 'Controles')
     v_max = cv.getTrackbarPos('V Max', 'Controles')
+    
+    # --- C. EXTRACCIÓN DE LA PARTE SANA (Con soporte para rojo envolvente) ---
+    if h_min <= h_max:
+        # MODO NORMAL (Ej. Amarillo, Verde, Naranja)
+        bajo = np.array([h_min, s_min, v_min])
+        alto = np.array([h_max, s_max, v_max])
+        mascara_sana = cv.inRange(hsv, bajo, alto)
+    else:
+        # MODO DUAL (Rojo: cuando el Mínimo cruza al Máximo)
+        rojo_bajo_1 = np.array([0, s_min, v_min])
+        rojo_alto_1 = np.array([h_max, s_max, v_max])
+        rojo_bajo_2 = np.array([h_min, s_min, v_min])
+        rojo_alto_2 = np.array([179, s_max, v_max])
+        
+        mascara_rojo_1 = cv.inRange(hsv, rojo_bajo_1, rojo_alto_1)
+        mascara_rojo_2 = cv.inRange(hsv, rojo_bajo_2, rojo_alto_2)
+        mascara_sana = cv.bitwise_or(mascara_rojo_1, mascara_rojo_2)
 
-    bajo = np.array([h_min, s_min, v_min])
-    alto = np.array([h_max, s_max, v_max])
+    # Solo para visualizar en la ventana "Parte Sana Aislada"
+    resultado_sano = cv.bitwise_and(frame, frame, mask=mascara_sana)
 
-    # 4. PARTE SANA: Máscara e Imagen filtrada
-    mascara_sana = cv.inRange(hsv, bajo, alto)
-    parte_sana_bgr = cv.bitwise_and(img, img, mask=mascara_sana)
-
-    # 5. DETECCIÓN COMPLETA DE LA FLOR (Tu lógica de Otsu optimizada)
-    H, S, V = cv.split(hsv)
-    v_suave = cv.GaussianBlur(V, (7, 7), 0)
-    s_suave = cv.GaussianBlur(S, (7,7),0)
-    # 'gris_nueva' es el molde completo de la flor (Sano + Daño)
-    _, gris_nueva = cv.threshold(v_suave, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    # --- D. EXTRACCIÓN DEL MOLDE DE LA FLOR (Ignorando fondo blanco) ---
+    _, S, _ = cv.split(hsv)
+    s_suave = cv.GaussianBlur(S, (7, 7), 0)
+    
+    # Binarización por Saturación: Aisla cualquier cosa que tenga color
     _, gris_nueva = cv.threshold(s_suave, 20, 255, cv.THRESH_BINARY)
 
-    # Limpieza del molde para rellenar huecos internos de los pétalos
+    # Limpieza Morfológica: Rellena los huecos negros dentro del molde de la flor
     kernel = np.ones((7, 7), np.uint8)
     gris_nueva = cv.morphologyEx(gris_nueva, cv.MORPH_CLOSE, kernel)
 
-    # 6. DETECCIÓN DE MARCHITACIONES (La Resta Lógica)
-    # Molde completo de la flor MENOS la parte que tus sliders dicen que está sana
+    # --- E. CÁLCULO DE MARCHITEZ (La Resta Lógica) ---
+    # Lo que pertenece a la flor entera PERO NO está dentro del rango sano
     mascara_marchita = cv.bitwise_and(gris_nueva, cv.bitwise_not(mascara_sana))
 
-    # 7. CÁLCULO DE ÁREAS (Tu uso de cv.contourArea)
-    # Contornos de la Flor Completa
+    # --- F. MATEMÁTICA DE ÁREAS ---
+    # 1. Área Total de la planta
     contornos_total, _ = cv.findContours(gris_nueva, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     area_total = sum([cv.contourArea(c) for c in contornos_total if cv.contourArea(c) > 100])
 
-    # Contornos de las Marchitaciones
+    # 2. Área del Daño
     contornos_marchitos, _ = cv.findContours(mascara_marchita, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     area_marchita = sum([cv.contourArea(c) for c in contornos_marchitos if cv.contourArea(c) > 30])
 
-    # 8. CÁLCULO DEL PORCENTAJE (FloraVision Formula)
+    # 3. Fórmula Porcentual
     if area_total > 0:
         porcentaje_marchito = (area_marchita / area_total) * 100
     else:
         porcentaje_marchito = 0
 
-    # 9. RENDERIZADO VISUAL
-    # Dibujamos el contorno total en Verde sobre su copia
+    # --- G. RENDERIZADO VISUAL ---
+    # Dibujar silueta total en Verde
     cv.drawContours(copia_visual_total, contornos_total, -1, (0, 255, 0), 2)
-    # Dibujamos el contorno del daño en Rojo sobre su copia
+    # Dibujar daño en Rojo
     cv.drawContours(copia_visual_danio, contornos_marchitos, -1, (0, 0, 255), 2)
 
-    # Texto en pantalla
+    # Mostrar porcentaje en la ventana de daño
     cv.putText(copia_visual_danio, f"Danio: {porcentaje_marchito:.1f}%", (20, 40),
                cv.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
 
-    # --- DESPLIEGUE DE VENTANAS ---
-    cv.imshow('Original', img)
-    cv.imshow('1. Mascara Sana (Sliders)', mascara_sana)
-    cv.imshow('2. Molde Flor Completa (Otsu)', copia_visual_total)
-    cv.imshow('3. Marchitamiento Detectado', copia_visual_danio)
+    # --- H. DESPLIEGUE EN PANTALLA ---
+    cv.imshow('1. Original', frame)
+    cv.imshow('2. Parte Sana Aislada', resultado_sano)
+    cv.imshow('3. Molde Flor Completa', copia_visual_total)
+    cv.imshow('4. Marchitamiento Detectado', copia_visual_danio)
 
-    # Condición de salida con ESC
+    # Salida controlada
     if cv.waitKey(1) & 0xFF == 27:
-        print(f"\nRangos guardados:")
-        print(f"bajo = np.array([{h_min}, {s_min}, {v_min}])")
-        print(f"alto = np.array([{h_max}, {s_max}, {v_max}])")
         break
 
 cv.destroyAllWindows()
