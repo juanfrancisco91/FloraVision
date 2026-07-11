@@ -1,44 +1,4 @@
 import streamlit as st
-st.set_page_config(
-    page_title="FloraVision",
-    layout="wide"
-)
-
-st.markdown("""
-<style>
-
-.stApp{
-background-color:#F5F0F2;
-}
-
-section[data-testid="stSidebar"]{
-background-color:#7A0044;
-}
-
-h1,h2,h3{
-color:#7A0044;
-}
-
-div.stButton > button{
-background-color:white;
-color:#7A0044;
-border-radius:25px;
-border:2px solid #C7A008;
-width:100%;
-padding:10px;
-font-size:16px;
-}
-
-.dashboard-card{
-background-color:#C993AF;
-padding:20px;
-border-radius:20px;
-margin-top:20px;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
 import pandas as pd
 import random
 
