@@ -33,10 +33,10 @@ PRECIOS_BASE = {
 # (nombre, deterioro_min, deterioro_max, pct_descuento)
 # ---------------------------------------------------------------------------
 REGLAS = [
-    ("Fresca",           0.00, 0.30,  0),
-    ("Deterioro leve",   0.30, 0.60, 20),
-    ("Deterioro severo", 0.60, 0.70, 50),
-    ("Pérdida",          0.70, 1.00, 100),
+    ("Fresca",           0.00, 0.25,   0),
+    ("Deterioro leve",   0.25, 0.50,  20),
+    ("Deterioro severo", 0.50, 0.75,  50),
+    ("Pérdida",          0.75, 1.01, 100),
 ]
 
 # Mapeo de estado → badge semántico para el frontend
@@ -53,22 +53,21 @@ ESTADO_A_BADGE = {
 # ---------------------------------------------------------------------------
 def calcular_precio(tipo_flor: str, probabilidades: list) -> dict | None:
     """
-    Recibe el tipo de flor y las probabilidades [fresca, deteriorada, perdida]
-    y retorna un dict con el precio final, estado y descuento.
-
-    Parámetros
-    ----------
-    tipo_flor     : str   — nombre de la flor (case-insensitive)
-    probabilidades: list  — [prob_fresca, prob_deteriorada, prob_perdida]
-
-    Retorna None si la flor no está en PRECIOS_BASE.
+    Recibe el tipo de flor y las probabilidades o nivel de deterioro [prob_fresca, prob_deteriorada, prob_perdida].
     """
     tipo_flor = tipo_flor.lower()
     if tipo_flor not in PRECIOS_BASE:
         return None
 
-    precio_base     = PRECIOS_BASE[tipo_flor]
-    nivel_deterioro = probabilidades[1] + probabilidades[2]
+    precio_base = PRECIOS_BASE[tipo_flor]
+    
+    # Nivel de deterioro (0.0 a 1.0)
+    if len(probabilidades) >= 3:
+        # Suma ponderada de deterioro
+        nivel_deterioro = probabilidades[1] * 0.5 + probabilidades[2] * 1.0
+    else:
+        nivel_deterioro = probabilidades[0]
+
     estado, descuento = "Pérdida", 100
 
     for nombre, minimo, maximo, pct in REGLAS:

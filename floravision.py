@@ -32,10 +32,13 @@ if _CAPTURE_DIR not in sys.path:
     sys.path.insert(0, _CAPTURE_DIR)
 
 try:
-    from analisis_imagen import analizar_marchitamiento, convertir_a_probabilidades
+    from analisis_imagen import analizar_marchitamiento, convertir_a_probabilidades, clasificar_flor_ia, hex_a_rangos_hsv
     VISION_DISPONIBLE = True
 except ImportError:
     VISION_DISPONIBLE = False
+
+    def hex_a_rangos_hsv(hex_str: str) -> dict:
+        return {"h_min": 20, "h_max": 85, "s_min": 50, "s_max": 255, "v_min": 50, "v_max": 255}
 
 from agentefloravision import AgenteFloraVision, PRECIOS_BASE
 
@@ -187,39 +190,114 @@ st.markdown(
             background-color: transparent !important;
         }}
 
-        /* 1. Forzar color de texto Maroon en absolutamente todos los elementos de la aplicación */
-        * {{
-            color: #5C0030 !important;
+        /* ===================================================================
+           SISTEMA INTEGRAL DE CONTRASTE Y TIPOGRAFÍA HIGH-CONTRAST
+           =================================================================== */
+
+        /* 1. TEXTO EN CONTENEDORES OSCUROS (Barra lateral, Banners IA, Cabeceras de tabla) */
+        [data-testid="stSidebar"],
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] div,
+        [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3,
+        .dark-container, .dark-container *,
+        .dark-card, .dark-card *,
+        .ai-banner, .ai-banner * {{
+            color: #FFFFFF !important;
         }}
-        
-        /* 2. Exceptuar explícitamente los badges de inventario, la métrica de oro y cabeceras de tabla */
-        .badge-saludable {{
-            color: #137333 !important;
+
+        /* Excepción en barra lateral: las pastillas blancas del menú (st.radio) llevan texto oscuro */
+        div[data-testid="stRadio"] label p,
+        div[data-testid="stRadio"] label span,
+        div[data-testid="stRadio"] label div {{
+            color: {TEXT_MAROON} !important;
+            font-weight: bold !important;
         }}
-        .badge-riesgo {{
-            color: #B06000 !important;
+
+        /* Texto Dorado Acentuado en contenedores oscuros */
+        .gold-accent, .dark-container .gold-accent, .ai-banner .gold-accent {{
+            color: #FFE87C !important;
+            font-weight: 800 !important;
         }}
-        .badge-enferma {{
-            color: #C5221F !important;
+
+        /* 2. TEXTO EN CONTENEDORES CLAROS (Cuerpo principal, Tarjetas blancas, Formularios) */
+        .main, .main p, .main span, .main label, .main div,
+        .block-container, .block-container p, .block-container span, .block-container label {{
+            color: #5C0030;
+        }}
+
+        /* Tarjetas KPI y cuadros blancos */
+        .kpi-card, .kpi-card * {{
+            background-color: white !important;
+            color: {TEXT_MAROON} !important;
+        }}
+        .kpi-title {{
+            color: {TEXT_MAROON} !important;
+            font-weight: bold !important;
+        }}
+        .kpi-value {{
+            color: {TEXT_MAROON} !important;
+            font-weight: 800 !important;
         }}
         .kpi-value-gold {{
             color: {GOLD} !important;
         }}
+
+        /* Cabecera vs Filas de Tabla de Inventario */
         .custom-table th, .custom-table th * {{
+            background-color: {MAROON} !important;
             color: #FFFFFF !important;
+            font-weight: bold !important;
         }}
-        /* 3b. Selectbox: texto blanco en el valor seleccionado y las opciones del dropdown */
+        .custom-table td, .custom-table td * {{
+            background-color: #FFFFFF !important;
+            color: #222222 !important;
+        }}
+
+        /* Badges de Inventario sobre blanco */
+        .badge-saludable {{
+            background-color: #E6F4EA !important;
+            color: #137333 !important;
+            font-weight: bold !important;
+        }}
+        .badge-riesgo {{
+            background-color: #FEF7E0 !important;
+            color: #B06000 !important;
+            font-weight: bold !important;
+        }}
+        .badge-enferma {{
+            background-color: #FCE8E6 !important;
+            color: #C5221F !important;
+            font-weight: bold !important;
+        }}
+
+        /* Selectbox y Dropdowns */
+        [data-testid="stSelectbox"] label,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] span,
         [data-testid="stSelectbox"] div[data-baseweb="select"] div {{
-            color: #FFFFFF !important;
-        }}
-        [data-testid="stSelectbox"] span {{
-            color: #FFFFFF !important;
+            color: {TEXT_MAROON} !important;
+            font-weight: 600 !important;
         }}
         [role="listbox"] li, [role="option"] {{
             color: {TEXT_MAROON} !important;
+            background-color: #FFFFFF !important;
         }}
-        
-        /* 3. Forzar fondo blanco y borde lila en el cargador de archivos (File Uploader) */
+
+        /* Botones generales */
+        div.stButton > button {{
+            background-color: #FFFFFF !important;
+            color: {TEXT_MAROON} !important;
+            border: 2px solid {CARD_BORDER} !important;
+            font-weight: bold !important;
+        }}
+        div.stButton > button:hover {{
+            background-color: {CREAM} !important;
+            color: {TEXT_MAROON} !important;
+            border-color: {MAROON} !important;
+        }}
+
+        /* 5. Forzar fondo blanco y borde en File Uploader */
         [data-testid="stFileUploaderDropzone"] {{
             background-color: white !important;
             border: 2px dashed {CARD_BORDER} !important;
@@ -242,31 +320,6 @@ st.markdown(
             margin-bottom: 2rem;
         }}
 
-        /* TARJETAS KPI GENERALES */
-        .kpi-card {{
-            background-color: white !important;
-            border: 4px solid {CARD_BORDER} !important;
-            border-radius: 20px !important;
-            padding: 1.5rem !important;
-            text-align: center !important;
-        }}
-        .kpi-title {{
-            font-family: 'Georgia', serif !important;
-            font-weight: bold !important;
-            font-size: 1.1rem !important;
-            color: {TEXT_MAROON} !important;
-            margin-bottom: 0.5rem !important;
-        }}
-        .kpi-value {{
-            font-family: 'Montserrat', sans-serif !important;
-            font-weight: 800 !important;
-            font-size: 2.2rem !important;
-            color: {TEXT_MAROON} !important;
-        }}
-        .kpi-value-gold {{
-            color: {GOLD} !important;
-        }}
-        
         /* ESTILO PARA CONTENEDOR DE FILA INFERIOR DEL DASHBOARD */
         .dashboard-box-light {{ 
             background-color: white !important; 
@@ -303,7 +356,7 @@ with st.sidebar:
     st.button("FloraVision", key="btn_logo_home", on_click=ir_a_inicio)
     st.markdown('<div class="brand-underline"></div>', unsafe_allow_html=True)
 
-    opciones_menu = ["Inicio", "Detección", "Inventario", "Dashboard"]
+    opciones_menu = ["Inicio", "Detección", "Entrenamiento IA", "Inventario", "Dashboard"]
     idx_defecto = opciones_menu.index(st.session_state.pagina_actual) if st.session_state.pagina_actual in opciones_menu else 0
 
     st.radio(
@@ -415,7 +468,8 @@ def render_deteccion():
 
     with col_ctrl:
         with st.container(border=True):
-            st.markdown(f'<div style="font-family:Georgia,serif;font-weight:bold;font-size:1rem;color:{TEXT_MAROON};margin-bottom:8px;">Tipo de Flor</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-family:Georgia,serif;font-weight:bold;font-size:1rem;color:{TEXT_MAROON};margin-bottom:4px;">Tipo de Flor</div>', unsafe_allow_html=True)
+            st.caption("&#129302; La IA identificará la flor automáticamente al cargar la foto. También puedes seleccionarla manualmente.")
             tipo_flor = st.selectbox(
                 "Tipo de Flor",
                 flores_disponibles,
@@ -426,42 +480,75 @@ def render_deteccion():
 
             st.divider()
 
-            # Sliders HSV — equivalentes exactos a los trackbars de cv_taskbar.py
-            st.markdown(f'<div style="font-family:Georgia,serif;font-weight:bold;font-size:1rem;color:{TEXT_MAROON};margin-bottom:4px;">Mascara de Color (HSV)</div>', unsafe_allow_html=True)
-            st.caption("Ajusta los rangos hasta aislar la parte sana de la flor.")
+            # Rueda de colores automática en vez de 6 sliders HSV
+            st.markdown(f'<div style="font-family:Georgia,serif;font-weight:bold;font-size:1rem;color:{TEXT_MAROON};margin-bottom:4px;">Color de la Flor (Pétalos Sanos)</div>', unsafe_allow_html=True)
+            st.caption("Toca el círculo para elegir el color exacto. El sistema calibrará los parámetros de detección automáticamente.")
 
-            # Inicializar valores HSV en un dict separado (NO en las mismas keys de los sliders)
-            # Esto evita el error: "cannot be modified after the widget is instantiated"
-            if "hsv_vals" not in st.session_state:
-                st.session_state.hsv_vals = {
-                    "h_min": 20, "h_max": 85,
-                    "s_min": 50, "s_max": 255,
-                    "v_min": 50, "v_max": 255,
-                }
+            if "color_seleccionado" not in st.session_state:
+                st.session_state.color_seleccionado = "#E60000"
+            if "cp_flor" not in st.session_state:
+                st.session_state["cp_flor"] = st.session_state.color_seleccionado
 
-            hv = st.session_state.hsv_vals
-            h_min = st.slider("H Min", 0,   179, hv["h_min"], key="sl_h_min")
-            h_max = st.slider("H Max", 0,   179, hv["h_max"], key="sl_h_max")
-            s_min = st.slider("S Min", 0,   255, hv["s_min"], key="sl_s_min")
-            s_max = st.slider("S Max", 0,   255, hv["s_max"], key="sl_s_max")
-            v_min = st.slider("V Min", 0,   255, hv["v_min"], key="sl_v_min")
-            v_max = st.slider("V Max", 0,   255, hv["v_max"], key="sl_v_max")
+            col_picker, col_info = st.columns([1, 2.2])
+            with col_picker:
+                color_elegido = st.color_picker(
+                    "Seleccionar color",
+                    value=st.session_state.color_seleccionado,
+                    key="cp_flor",
+                    label_visibility="collapsed",
+                )
+                st.session_state.color_seleccionado = color_elegido
 
-            # Sincronizar hsv_vals con los valores actuales de los sliders
-            st.session_state.hsv_vals = {
-                "h_min": h_min, "h_max": h_max,
-                "s_min": s_min, "s_max": s_max,
-                "v_min": v_min, "v_max": v_max,
-            }
+            with col_info:
+                st.markdown(f"""<div style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+                    <div style="width:22px; height:22px; border-radius:50%; background-color:{color_elegido}; border:2px solid {CARD_BORDER}; box-shadow: 0 2px 4px rgba(0,0,0,0.15);"></div>
+                    <span style="font-family:Georgia,serif; font-weight:bold; font-size:0.95rem; color:{TEXT_MAROON};">{color_elegido.upper()}</span>
+                </div>""", unsafe_allow_html=True)
 
-            # Preset Rojo — escribe en hsv_vals (no en las keys de los sliders)
-            if st.button("Aplicar Preset Rojo", use_container_width=True, key="btn_preset_rojo"):
-                st.session_state.hsv_vals = {
-                    "h_min": 170, "h_max": 10,
-                    "s_min": 50,  "s_max": 255,
-                    "v_min": 50,  "v_max": 255,
-                }
-                st.rerun()
+            # Presets visuales rápidos de colores comunes de flores
+            st.markdown(f'<div style="font-size:0.8rem; font-weight:bold; color:{TEXT_MAROON}; margin-top:12px; margin-bottom:6px;">Presets Rápidos de Flor:</div>', unsafe_allow_html=True)
+            preset_cols = st.columns(5)
+            presets = [
+                ("🌹 Rojo", "#E60000", "p_rojo"),
+                ("🌻 Amarillo", "#FBC02D", "p_amarillo"),
+                ("🌸 Rosa", "#EC407A", "p_rosa"),
+                ("💜 Violeta", "#8E24AA", "p_violeta"),
+                ("🧡 Naranja", "#FB8C00", "p_naranja"),
+            ]
+
+            def _cb_aplicar_preset(hex_val):
+                st.session_state.color_seleccionado = hex_val
+                st.session_state["cp_flor"] = hex_val
+
+            for col_p, (label, hex_val, key_p) in zip(preset_cols, presets):
+                with col_p:
+                    st.button(
+                        label.split()[0],
+                        key=key_p,
+                        help=label,
+                        on_click=_cb_aplicar_preset,
+                        args=(hex_val,),
+                    )
+
+            # Ajuste automático por detrás (rango HSV calculado en backend)
+            rangos = hex_a_rangos_hsv(st.session_state.color_seleccionado)
+            h_min = rangos["h_min"]
+            h_max = rangos["h_max"]
+            s_min = rangos["s_min"]
+            s_max = rangos["s_max"]
+            v_min = rangos["v_min"]
+            v_max = rangos["v_max"]
+
+            # Variables locales de rangos HSV accesibles en todo render_deteccion
+            h_min_v = h_min
+            h_max_v = h_max
+            s_min_v = s_min
+            s_max_v = s_max
+            v_min_v = v_min
+            v_max_v = v_max
+            pct_preview = 0.0
+
+            st.session_state.hsv_vals = rangos
 
             st.divider()
 
@@ -471,23 +558,48 @@ def render_deteccion():
                 horizontal=True,
             )
 
-            imagen_np = None
+            if "imagen_actual" not in st.session_state:
+                st.session_state.imagen_actual = None
+            if "ultimo_metodo" not in st.session_state:
+                st.session_state.ultimo_metodo = metodo_entrada
+
+            if st.session_state.ultimo_metodo != metodo_entrada:
+                st.session_state.imagen_actual = None
+                st.session_state.ultimo_metodo = metodo_entrada
 
             if metodo_entrada == "Subir archivo":
                 archivo = st.file_uploader(
                     "Sube una foto para analisis",
                     type=["jpg", "jpeg", "png"],
+                    key="uploader_foto",
                 )
-                if archivo:
-                    bytes_data = archivo.read()
-                    imagen_np = np.frombuffer(bytes_data, np.uint8)
-                    imagen_np = cv2.imdecode(imagen_np, cv2.IMREAD_COLOR)
+                if archivo is not None:
+                    try:
+                        bytes_data = archivo.getvalue()
+                        if len(bytes_data) > 0:
+                            img_decoded = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
+                            if img_decoded is not None:
+                                st.session_state.imagen_actual = img_decoded
+                    except Exception:
+                        pass
             else:
-                imagen_camara = st.camera_input("Captura con la camara")
-                if imagen_camara:
-                    bytes_data = imagen_camara.getvalue()
-                    imagen_np = np.frombuffer(bytes_data, np.uint8)
-                    imagen_np = cv2.imdecode(imagen_np, cv2.IMREAD_COLOR)
+                imagen_camara = st.camera_input("Captura con la camara", key="camara_foto")
+                if imagen_camara is not None:
+                    try:
+                        bytes_data = imagen_camara.getvalue()
+                        if len(bytes_data) > 0:
+                            img_decoded = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
+                            if img_decoded is not None:
+                                st.session_state.imagen_actual = img_decoded
+                    except Exception:
+                        pass
+
+            if st.session_state.imagen_actual is not None:
+                if st.button("🗑️ Quitar / Cambiar Imagen", key="btn_quitar_foto"):
+                    st.session_state.imagen_actual = None
+                    st.rerun()
+
+            imagen_np = st.session_state.imagen_actual
 
             analizar_btn = st.button(
                 "Analizar Marchitamiento",
@@ -497,16 +609,36 @@ def render_deteccion():
             )
 
     # ------------------------------------------------------------------
-    # COLUMNA DERECHA: Vista previa de mascaras (replica las 4 ventanas
-    # de cv_taskbar.py: Original, Parte Sana, Molde Total, Marchitamiento)
+    # COLUMNA DERECHA: Vista previa de mascaras e Identificación IA
     # ------------------------------------------------------------------
     with col_vista:
         with st.container(border=True):
             if imagen_np is None:
-                st.info("Carga una imagen para ver las mascaras en tiempo real.")
+                st.info("Carga una imagen para ver las mascaras y la clasificacion por IA en tiempo real.")
             else:
+                # Inferencia IA en tiempo real al subir imagen
+                res_ia_preview = clasificar_flor_ia(imagen_np) if VISION_DISPONIBLE else {"modelo_activo": False}
+                if res_ia_preview.get("modelo_activo"):
+                    especie_ia = res_ia_preview.get("especie", "Desconocida")
+                    confianza_ia = res_ia_preview.get("confianza", 0.0)
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, {MAROON} 0%, {MAROON_DARK} 100%); color: white; padding: 14px 20px; border-radius: 12px; margin-bottom: 14px; box-shadow: 0 4px 12px rgba(92,0,48,0.25);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <span style="font-size:0.78rem; letter-spacing:1px; opacity:0.9; text-transform:uppercase; color:#E2DFDF;">&#129302; Identificación por Modelo IA (MobileNetV2)</span>
+                                <div style="font-family:'Montserrat',sans-serif; font-size:1.35rem; font-weight:800; color:#FFFFFF; text-shadow:0px 2px 4px rgba(0,0,0,0.3); margin-top:3px;">
+                                    Flor Detectada: <span style="color:#FFE87C;">{especie_ia}</span>
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <span style="font-size:0.78rem; opacity:0.9; color:#E2DFDF;">Confianza IA</span>
+                                <div style="font-family:'Montserrat',sans-serif; font-size:1.35rem; font-weight:800; color:#FFE87C; text-shadow:0px 2px 4px rgba(0,0,0,0.3); margin-top:3px;">{confianza_ia}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
                 # ----- Replicar exactamente la logica de cv_taskbar.py -----
-                # Los valores HSV vienen directamente de los sliders (ya son variables locales)
                 h_min_v = h_min
                 h_max_v = h_max
                 s_min_v = s_min
@@ -517,27 +649,33 @@ def render_deteccion():
                 hsv = cv2.cvtColor(imagen_np, cv2.COLOR_BGR2HSV)
                 _, S, _ = cv2.split(hsv)
 
-                # Mascara sana (parte del color seleccionado)
+                # 1. Máscara de pétalos sanos (color seleccionado)
                 if h_min_v <= h_max_v:
                     bajo  = np.array([h_min_v, s_min_v, v_min_v])
                     alto  = np.array([h_max_v, s_max_v, v_max_v])
-                    mascara_sana = cv2.inRange(hsv, bajo, alto)
+                    mascara_petalos = cv2.inRange(hsv, bajo, alto)
                 else:
                     # Modo dual rojo
                     m1 = cv2.inRange(hsv, np.array([0,       s_min_v, v_min_v]), np.array([h_max_v, s_max_v, v_max_v]))
                     m2 = cv2.inRange(hsv, np.array([h_min_v, s_min_v, v_min_v]), np.array([179,     s_max_v, v_max_v]))
-                    mascara_sana = cv2.bitwise_or(m1, m2)
+                    mascara_petalos = cv2.bitwise_or(m1, m2)
+
+                # 2. Máscara de hojas y tallo sanos (Verde en HSV: H: 35..85, S: 30..255, V: 30..255)
+                mascara_hojas = cv2.inRange(hsv, np.array([35, 30, 30]), np.array([85, 255, 255]))
+
+                # 3. Máscara sana total = Pétalos sanos + Hojas/Tallo sanos
+                mascara_sana = cv2.bitwise_or(mascara_petalos, mascara_hojas)
 
                 # Parte sana aislada
                 resultado_sano = cv2.bitwise_and(imagen_np, imagen_np, mask=mascara_sana)
 
-                # Molde total de la flor (umbral de saturacion + morfologia)
+                # 4. Molde total de la flor/planta (Saturación y brillo significativos)
                 s_suave = cv2.GaussianBlur(S, (7, 7), 0)
-                _, gris_total = cv2.threshold(s_suave, 20, 255, cv2.THRESH_BINARY)
+                _, gris_total = cv2.threshold(s_suave, 30, 255, cv2.THRESH_BINARY)
                 kernel = np.ones((7, 7), np.uint8)
                 gris_total = cv2.morphologyEx(gris_total, cv2.MORPH_CLOSE, kernel)
 
-                # Mascara marchita = total - sana
+                # 5. Máscara marchita = molde de la planta − partes sanas
                 mascara_marchita = cv2.bitwise_and(gris_total, cv2.bitwise_not(mascara_sana))
 
                 # Contornos y areas (igual que cv_taskbar.py)
@@ -546,9 +684,9 @@ def render_deteccion():
                 contornos_total,   _ = cv2.findContours(gris_total,       cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 contornos_marchito, _ = cv2.findContours(mascara_marchita, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-                area_total   = sum(cv2.contourArea(c) for c in contornos_total    if cv2.contourArea(c) > 100)
-                area_marchita = sum(cv2.contourArea(c) for c in contornos_marchito if cv2.contourArea(c) > 30)
-                pct_preview  = (area_marchita / area_total * 100) if area_total > 0 else 0.0
+                area_total   = float(np.count_nonzero(gris_total))
+                area_marchita = float(np.count_nonzero(mascara_marchita))
+                pct_preview  = min(100.0, max(0.0, (area_marchita / area_total * 100.0))) if area_total > 0 else 0.0
 
                 cv2.drawContours(frame_total, contornos_total,    -1, (0, 255, 0), 2)
                 cv2.drawContours(frame_danio, contornos_marchito, -1, (0, 0, 255), 2)
@@ -584,24 +722,27 @@ def render_deteccion():
                 )
 
     # ------------------------------------------------------------------
-    # BOTÓN ANALIZAR — ejecuta el pipeline completo del agente
+    # BOTÓN ANALIZAR — ejecuta el pipeline completo del agente + IA
     # ------------------------------------------------------------------
     if analizar_btn and imagen_np is not None:
-        with st.spinner("Procesando con el agente..."):
-            if VISION_DISPONIBLE:
-                resultado_cv = analizar_marchitamiento(
-                    imagen_np,
-                    h_min=h_min_v, s_min=s_min_v, v_min=v_min_v,
-                    h_max=h_max_v, s_max=s_max_v, v_max=v_max_v,
-                )
-                pct_marchito = resultado_cv["porcentaje_marchito"]
-            else:
-                pct_marchito = pct_preview
+        with st.spinner("Procesando visión por computadora e inferencia con IA..."):
+            res_ia = clasificar_flor_ia(imagen_np) if VISION_DISPONIBLE else {"modelo_activo": False}
+
+            # Si la IA identifica la flor con confianza > 40%, usamos esa especie automáticamente
+            tipo_evaluado = tipo_flor
+            if res_ia.get("modelo_activo") and res_ia.get("confianza", 0) > 40:
+                especie_ia = res_ia["especie"].lower()
+                if especie_ia in PRECIOS_BASE:
+                    tipo_evaluado = especie_ia
+
+            # Utilizar el porcentaje exacto ya calculado en la vista previa de OpenCV para garantizar consistencia 100%
+            pct_marchito = pct_preview
 
             probs = convertir_a_probabilidades(pct_marchito)
-            resultado_agente = agente.percibir(tipo_flor.lower(), probs, cantidad=1)
+            resultado_agente = agente.percibir(tipo_evaluado.lower(), probs, cantidad=1)
             if resultado_agente:
                 resultado_agente["porcentaje_marchito"] = pct_marchito
+                resultado_agente["resultado_ia"] = res_ia
                 st.session_state.ultimo_resultado = resultado_agente
                 st.rerun()
 
@@ -620,6 +761,26 @@ def render_deteccion():
             recomendacion = res.get("recomendacion", "")
             tipo      = res.get("tipo_flor", "")
             ts        = res.get("timestamp", "")
+            res_ia    = res.get("resultado_ia", {})
+
+            # Si el modelo de IA está activo, mostrar tarjeta con la predicción de especie y confianza
+            if res_ia.get("modelo_activo"):
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {MAROON} 0%, {MAROON_DARK} 100%); color: white; padding: 14px 20px; border-radius: 12px; margin-top: 6px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(92,0,48,0.25);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="font-size:0.78rem; letter-spacing:1px; opacity:0.9; text-transform:uppercase; color:#E2DFDF;">&#129302; Modelo IA (MobileNetV2 / Transfer Learning)</span>
+                            <div style="font-family:'Montserrat',sans-serif; font-size:1.35rem; font-weight:800; color:#FFFFFF; text-shadow:0px 2px 4px rgba(0,0,0,0.3); margin-top:3px;">
+                                Especie Detectada por IA: <span style="color:#FFE87C;">{res_ia.get('especie')}</span>
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="font-size:0.78rem; opacity:0.9; color:#E2DFDF;">Confianza IA</span>
+                            <div style="font-family:'Montserrat',sans-serif; font-size:1.35rem; font-weight:800; color:#FFE87C; text-shadow:0px 2px 4px rgba(0,0,0,0.3); margin-top:3px;">{res_ia.get('confianza')}%</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
             badge_color_map = {
                 "Saludable": ("#E6F4EA", "#137333"),
@@ -675,9 +836,17 @@ def render_deteccion():
             )
             st.caption(f"Analisis realizado a las {ts}")
 
-            if st.button("Nueva deteccion", key="btn_reset", use_container_width=True):
-                st.session_state.ultimo_resultado = None
-                st.rerun()
+            st.markdown('<div style="margin-top:14px;"></div>', unsafe_allow_html=True)
+            col_b1, col_b2 = st.columns([1.2, 1])
+            with col_b1:
+                if st.button("➕ Agregar al Inventario", key="btn_add_inv", use_container_width=True):
+                    st.session_state.agente.actuar(res)
+                    st.success(f"✅ {tipo} ({estado}) guardada en el inventario.")
+                    st.toast(f"🌸 {tipo} añadida al inventario")
+            with col_b2:
+                if st.button("🔄 Nueva deteccion", key="btn_reset", use_container_width=True):
+                    st.session_state.ultimo_resultado = None
+                    st.rerun()
 
 
 def render_inventario():
@@ -993,6 +1162,101 @@ def render_dashboard():
 </div>"""
         st.markdown(alertas_html, unsafe_allow_html=True)
 
+def render_entrenamiento():
+    import os, time, subprocess
+    st.markdown('<div class="section-title">Entrenamiento de Modelo IA (feature/model-training)</div>', unsafe_allow_html=True)
+    st.caption("Transfer Learning con MobileNetV2 / ResNet50, Data Augmentation y exportación de modelo entrenado (.h5 / .keras).")
+
+    base_dir = _BASE_DIR
+    h5_path = os.path.join(base_dir, "modelo_flores.h5")
+    keras_path = os.path.join(base_dir, "modelo_flores.keras")
+    plot_path = os.path.join(base_dir, "feature-training", "training_metrics.png")
+
+    # 1. TARJETAS DE ESTADO DEL MODELO
+    col_c1, col_c2, col_c3 = st.columns(3)
+    
+    modelo_existe = os.path.exists(keras_path) or os.path.exists(h5_path)
+    if modelo_existe:
+        active_path = keras_path if os.path.exists(keras_path) else h5_path
+        mod_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(active_path)))
+        size_mb = round(os.path.getsize(active_path) / (1024 * 1024), 2)
+        status_html = f'<div style="color:#137333; font-weight:bold;">✅ Modelo Activo ({size_mb} MB)</div><div style="font-size:0.8rem; color:#666;">Guardado: {mod_time}</div>'
+    else:
+        status_html = '<div style="color:#C5221F; font-weight:bold;">⚠️ Modelo No Encontrado</div><div style="font-size:0.8rem; color:#666;">Presiona iniciar entrenamiento abajo</div>'
+
+    with col_c1:
+        st.markdown(f"""
+        <div style="background:white; border:2px solid {CARD_BORDER}; border-radius:14px; padding:16px; box-shadow:0 4px 10px rgba(0,0,0,0.03);">
+            <div style="font-family:'Montserrat',sans-serif; font-size:0.85rem; color:{TEXT_MAROON}; font-weight:bold; text-transform:uppercase;">Estado de Modelo</div>
+            <div style="font-family:'Georgia',serif; font-size:1.1rem; margin-top:8px;">{status_html}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_c2:
+        st.markdown(f"""
+        <div style="background:white; border:2px solid {CARD_BORDER}; border-radius:14px; padding:16px; box-shadow:0 4px 10px rgba(0,0,0,0.03);">
+            <div style="font-family:'Montserrat',sans-serif; font-size:0.85rem; color:{TEXT_MAROON}; font-weight:bold; text-transform:uppercase;">Arquitectura Backbone</div>
+            <div style="font-family:'Georgia',serif; font-size:1.1rem; font-weight:bold; color:{TEXT_MAROON}; margin-top:8px;">MobileNetV2 / ResNet50</div>
+            <div style="font-size:0.8rem; color:#666;">Preentrenado en ImageNet (7 Clases)</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_c3:
+        st.markdown(f"""
+        <div style="background:white; border:2px solid {CARD_BORDER}; border-radius:14px; padding:16px; box-shadow:0 4px 10px rgba(0,0,0,0.03);">
+            <div style="font-family:'Montserrat',sans-serif; font-size:0.85rem; color:{TEXT_MAROON}; font-weight:bold; text-transform:uppercase;">Data Augmentation</div>
+            <div style="font-family:'Georgia',serif; font-size:1.1rem; font-weight:bold; color:{TEXT_MAROON}; margin-top:8px;">Flip, Rotate, Zoom, Contrast</div>
+            <div style="font-size:0.8rem; color:#666;">Optimizador Adam + Early Stopping</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # 2. SECCIÓN DE MÉTRICAS Y CONTROL DE ENTRENAMIENTO
+    col_ctrl, col_plot = st.columns([1, 1.2])
+
+    with col_ctrl:
+        with st.container(border=True):
+            st.markdown(f'<div style="font-family:Georgia,serif; font-weight:bold; font-size:1.1rem; color:{TEXT_MAROON}; margin-bottom:12px;">Parámetros de Entrenamiento</div>', unsafe_allow_html=True)
+            epochs_input = st.slider("Épocas de Entrenamiento", min_value=2, max_value=20, value=6, key="tr_epochs")
+            batch_size_input = st.select_slider("Batch Size", options=[8, 16, 32], value=16, key="tr_batch")
+            model_type_input = st.selectbox("Modelo Base (Backbone)", ["mobilenet", "resnet"], index=0, key="tr_model")
+            
+            btn_train = st.button("🚀 Ejecutar Entrenamiento de IA", use_container_width=True, key="btn_exec_train")
+            
+            if btn_train:
+                with st.spinner("Entrenando IA con Transfer Learning y Fine-Tuning... Esto tomará unos segundos."):
+                    env_python = os.path.join(base_dir, ".env", "Scripts", "python.exe")
+                    if not os.path.exists(env_python):
+                        env_python = sys.executable
+
+                    script_path = os.path.join(base_dir, "feature-training", "train_model.py")
+                    cmd = [
+                        env_python, script_path,
+                        "--epochs", str(epochs_input),
+                        "--batch-size", str(batch_size_input),
+                        "--model-type", model_type_input,
+                        "--sample-dataset"
+                    ]
+                    
+                    res = subprocess.run(cmd, capture_output=True, text=True)
+                    if res.returncode == 0:
+                        st.success("✅ ¡Modelo entrenado y exportado exitosamente a modelo_flores.h5 y modelo_flores.keras!")
+                        import analisis_imagen
+                        analisis_imagen._MODELO_IA_CACHE = None
+                        st.rerun()
+                    else:
+                        st.error(f"Error durante el entrenamiento: {res.stderr}")
+
+    with col_plot:
+        with st.container(border=True):
+            st.markdown(f'<div style="font-family:Georgia,serif; font-weight:bold; font-size:1.1rem; color:{TEXT_MAROON}; margin-bottom:12px;">Métricas del Modelo Guardado</div>', unsafe_allow_html=True)
+            if os.path.exists(plot_path):
+                st.image(plot_path, use_container_width=True, caption="Precisión (Accuracy) y Pérdida (Loss) durante Transfer Learning & Fine-Tuning")
+            else:
+                st.info("Ejecuta un entrenamiento para visualizar las curvas de rendimiento y métricas.")
+
+
 # ---------------------------------------------------------------------------
 # ENRUTADOR PRINCIPAL
 # ---------------------------------------------------------------------------
@@ -1000,6 +1264,8 @@ if st.session_state.pagina_actual == "Inicio":
     render_inicio()
 elif st.session_state.pagina_actual == "Detección":
     render_deteccion()
+elif st.session_state.pagina_actual == "Entrenamiento IA":
+    render_entrenamiento()
 elif st.session_state.pagina_actual == "Inventario":
     render_inventario()
 elif st.session_state.pagina_actual == "Dashboard":
