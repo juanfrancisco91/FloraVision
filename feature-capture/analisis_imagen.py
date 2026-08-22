@@ -13,6 +13,8 @@ Uso:
 
 import cv2 as cv
 import numpy as np
+import os
+import json
 
 
 # ---------------------------------------------------------------------------
@@ -131,26 +133,89 @@ def convertir_a_probabilidades(porcentaje_marchito: float) -> list:
     """
     Convierte el porcentaje de marchitamiento (0–100%) al formato de probabilidades
     esperado por AgenteFloraVision: [prob_fresca, prob_deteriorada, prob_perdida].
+
+    Umbrales:
+    - 0% a 50%: Fresca / Saludable
+    - 50% a 80%: Deteriorada / En Riesgo
+    - >= 80%: Pérdida / Enferma
     """
     p = max(0.0, min(100.0, porcentaje_marchito)) / 100.0  # 0.0 a 1.0
 
-    if p <= 0.25:
-        return [1.0 - p, p, 0.0]
-    elif p <= 0.50:
-        frac = (p - 0.25) / 0.25
-        return [0.75 * (1.0 - frac), 0.25 + 0.5 * frac, 0.25 * frac]
-    elif p <= 0.75:
-        frac = (p - 0.50) / 0.25
-        return [0.0, 0.75 * (1.0 - frac), 0.25 + 0.75 * frac]
+    if p < 0.50:
+        return [1.0 - p, p * 0.2, 0.0]
+    elif p < 0.80:
+        frac = (p - 0.50) / 0.30
+        return [0.1 * (1.0 - frac), 0.8, 0.1 + 0.8 * frac]
     else:
-        return [0.0, 0.0, 1.0]
+        return [0.0, 0.1, 0.9]
 
 
 # ---------------------------------------------------------------------------
 # INFERENCIA Y CLASIFICACIÓN CON MODELO DE DEEP LEARNING (MobileNetV2 / ResNet50)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# INFERENCIA Y CLASIFICACIÓN CON MODELO DE DEEP LEARNING (MobileNetV2 / ResNet50)
+# ---------------------------------------------------------------------------
 _MODELO_IA_CACHE = None
+_FEEDBACK_MEMORY = {}
 CLASES_FLORES = ["Rosa", "Girasol", "Margarita", "Clavel", "Lirio", "Orquídea", "Tulipán"]
+
+RUTA_MEMORIA_JSON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "feedback_memory.json")
+
+
+def calcular_hash_imagen(imagen_np: np.ndarray) -> str:
+    """
+    Calcula un Perceptual dHash (difference hash) de 64 bits para una imagen NumPy.
+    Invariante ante compresión JPEG, leves cambios de tamaño o contraste.
+    """
+    try:
+        if len(imagen_np.shape) == 3 and imagen_np.shape[2] == 4:
+            gris = cv.cvtColor(imagen_np, cv.COLOR_RGBA2GRAY)
+        elif len(imagen_np.shape) == 3:
+            gris = cv.cvtColor(imagen_np, cv.COLOR_BGR2GRAY)
+        else:
+            gris = imagen_np
+
+        resized = cv.resize(gris, (9, 8), interpolation=cv.INTER_AREA)
+        diff = resized[:, 1:] > resized[:, :-1]
+        
+        # Generar entero de 64-bit como string
+        hash_val = 0
+        for i, val in enumerate(diff.flatten()):
+            if val:
+                hash_val |= (1 << i)
+        return str(hash_val)
+    except Exception:
+        return str(hash(imagen_np.tobytes()))
+
+
+def cargar_memoria_refuerzo() -> dict:
+    """Carga el registro persistente de correcciones humanas por refuerzo desde JSON."""
+    global _FEEDBACK_MEMORY
+    if _FEEDBACK_MEMORY:
+        return _FEEDBACK_MEMORY
+
+    if os.path.exists(RUTA_MEMORIA_JSON):
+        try:
+            import json
+            with open(RUTA_MEMORIA_JSON, "r", encoding="utf-8") as f:
+                _FEEDBACK_MEMORY = json.load(f)
+        except Exception as e:
+            print(f"⚠️ Error cargando feedback_memory.json: {e}")
+            _FEEDBACK_MEMORY = {}
+    return _FEEDBACK_MEMORY
+
+
+def guardar_memoria_refuerzo():
+    """Guarda la memoria de correcciones por refuerzo en feedback_memory.json."""
+    global _FEEDBACK_MEMORY
+    try:
+        import json
+        with open(RUTA_MEMORIA_JSON, "w", encoding="utf-8") as f:
+            json.dump(_FEEDBACK_MEMORY, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ Error guardando feedback_memory.json: {e}")
+
 
 def cargar_modelo_ia():
     """
@@ -161,8 +226,11 @@ def cargar_modelo_ia():
     if _MODELO_IA_CACHE is not None:
         return _MODELO_IA_CACHE
 
-    import os
-    import tensorflow as tf
+    try:
+        import tensorflow as tf
+    except Exception as err_tf:
+        print(f"⚠️ TensorFlow no disponible: {err_tf}")
+        return None
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     posibles_rutas = [
@@ -175,7 +243,6 @@ def cargar_modelo_ia():
     for ruta in posibles_rutas:
         if os.path.exists(ruta):
             try:
-                # Carga segura en Keras 3 / TensorFlow
                 _MODELO_IA_CACHE = tf.keras.models.load_model(ruta, compile=False, safe_mode=False)
                 return _MODELO_IA_CACHE
             except Exception as e:
@@ -186,16 +253,50 @@ def cargar_modelo_ia():
 
 def clasificar_flor_ia(imagen_np: np.ndarray) -> dict:
     """
-    Clasifica una imagen NumPy RGB/BGR con el modelo Deep Learning preentrenado.
-    
-    Retorna
-    -------
-    dict con claves:
-        modelo_activo   : bool   (True si el modelo .h5/.keras está cargado)
-        especie         : str    (Nombre de la flor predicha)
-        confianza       : float  (Porcentaje de confianza 0–100)
-        probabilidades  : dict   ({especie: prob})
+    Clasifica una imagen NumPy RGB/BGR con el modelo Deep Learning preentrenado
+    combinado con el registro persistente de Aprendizaje por Refuerzo.
     """
+    if imagen_np is None or imagen_np.size == 0:
+        return {
+            "modelo_activo": False,
+            "especie": None,
+            "confianza": 0.0,
+            "probabilidades": {}
+        }
+
+    # 1. VERIFICAR MEMORIA DE APRENDIZAJE POR REFUERZO HUMANO (Perceptual Hash)
+    memoria = cargar_memoria_refuerzo()
+    h_img_str = calcular_hash_imagen(imagen_np)
+
+    # 1A. Coincidencia directa de Hash
+    if h_img_str in memoria:
+        especie_memorizada = memoria[h_img_str]
+        prob_dict = {cls: (100.0 if cls == especie_memorizada else 0.0) for cls in CLASES_FLORES}
+        return {
+            "modelo_activo": True,
+            "especie": especie_memorizada,
+            "confianza": 100.0,
+            "corregido_por_refuerzo": True,
+            "probabilidades": prob_dict
+        }
+
+    # 1B. Coincidencia por distancia Hamming dHash (similitud visual cercana)
+    if h_img_str.isdigit():
+        h_val = int(h_img_str)
+        for saved_hash, saved_especie in memoria.items():
+            if saved_hash.isdigit():
+                dist = bin(h_val ^ int(saved_hash)).count('1')
+                if dist <= 12:  # Alta similitud perceptual de imagen
+                    prob_dict = {cls: (100.0 if cls == saved_especie else 0.0) for cls in CLASES_FLORES}
+                    return {
+                        "modelo_activo": True,
+                        "especie": saved_especie,
+                        "confianza": 99.0,
+                        "corregido_por_refuerzo": True,
+                        "probabilidades": prob_dict
+                    }
+
+    # 2. INFERENCIA CON MODELO TENSORFLOW / KERAS DEEP LEARNING
     modelo = cargar_modelo_ia()
     if modelo is None:
         return {
@@ -206,7 +307,6 @@ def clasificar_flor_ia(imagen_np: np.ndarray) -> dict:
         }
 
     try:
-        # Preprocesar imagen
         if imagen_np.shape[2] == 4:
             img_rgb = cv.cvtColor(imagen_np, cv.COLOR_RGBA2RGB)
         elif len(imagen_np.shape) == 3 and imagen_np.shape[2] == 3:
@@ -241,4 +341,100 @@ def clasificar_flor_ia(imagen_np: np.ndarray) -> dict:
             "confianza": 0.0,
             "probabilidades": {}
         }
+
+
+def aprender_por_refuerzo(imagen_np: np.ndarray, especie_correcta: str) -> dict:
+    """
+    Aplica aprendizaje por refuerzo y fine-tuning en caliente al modelo de IA
+    y registra la huella perceptual de la imagen para garantizar que las correcciones
+    prevalezcan inmediatamente y persistan en disco.
+    """
+    import os
+    import time
+
+    especie_norm = especie_correcta.capitalize()
+    if especie_norm not in CLASES_FLORES:
+        coincidencias = [c for c in CLASES_FLORES if c.lower() == especie_correcta.lower()]
+        if coincidencias:
+            especie_norm = coincidencias[0]
+        else:
+            return {"exito": False, "mensaje": f"Especie '{especie_correcta}' no válida."}
+
+    # 1. Registrar dHash Perceptual en la Memoria Persistente de Refuerzo
+    h_img_str = calcular_hash_imagen(imagen_np)
+    cargar_memoria_refuerzo()
+    _FEEDBACK_MEMORY[h_img_str] = especie_norm
+    guardar_memoria_refuerzo()
+
+    # 2. Guardar la imagen en el dataset físico de feedback
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dir_feedback = os.path.join(base_dir, "dataset", "feedback", especie_norm.lower())
+    os.makedirs(dir_feedback, exist_ok=True)
+
+    timestamp_str = int(time.time())
+    ruta_img = os.path.join(dir_feedback, f"feedback_{timestamp_str}.jpg")
+
+    try:
+        if len(imagen_np.shape) == 3 and imagen_np.shape[2] == 4:
+            img_bgr = cv.cvtColor(imagen_np, cv.COLOR_RGBA2BGR)
+        elif len(imagen_np.shape) == 3 and imagen_np.shape[2] == 3:
+            img_bgr = cv.cvtColor(imagen_np, cv.COLOR_RGB2BGR) if imagen_np.dtype == np.uint8 else imagen_np
+        else:
+            img_bgr = imagen_np
+        cv.imwrite(ruta_img, img_bgr)
+    except Exception as e:
+        print(f"⚠️ No se pudo guardar imagen de feedback: {e}")
+
+    # 3. Fine-tuning multiepoch en TensorFlow Keras (si está disponible)
+    modelo = cargar_modelo_ia()
+    loss_val = 0.0
+
+    if modelo is not None:
+        try:
+            import tensorflow as tf
+            if len(imagen_np.shape) == 3 and imagen_np.shape[2] == 4:
+                img_rgb = cv.cvtColor(imagen_np, cv.COLOR_RGBA2RGB)
+            elif len(imagen_np.shape) == 3:
+                img_rgb = cv.cvtColor(imagen_np, cv.COLOR_BGR2RGB)
+            else:
+                img_rgb = imagen_np
+
+            img_resized = cv.resize(img_rgb, (224, 224))
+            img_tensor = np.expand_dims(img_resized, axis=0)
+
+            # Vector Target One-Hot
+            idx_target = CLASES_FLORES.index(especie_norm)
+            target_one_hot = np.zeros((1, len(CLASES_FLORES)), dtype=np.float32)
+            target_one_hot[0, idx_target] = 1.0
+
+            # Recompilar con Tasa de Aprendizaje Efectiva (1e-3)
+            modelo.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+                loss="categorical_crossentropy",
+                metrics=["accuracy"]
+            )
+
+            # Ejecutar 5 iteraciones de entrenamiento en caliente para forzar la actualización de los pesos
+            for _ in range(5):
+                res_loss = modelo.train_on_batch(img_tensor, target_one_hot)
+                loss_val = float(res_loss[0]) if isinstance(res_loss, (list, np.ndarray)) else float(res_loss)
+
+            # Re-guardar el modelo actualizado en disco
+            ruta_keras = os.path.join(base_dir, "modelo_flores.keras")
+            ruta_h5 = os.path.join(base_dir, "modelo_flores.h5")
+            try:
+                modelo.save(ruta_keras)
+                modelo.save(ruta_h5)
+            except Exception as save_err:
+                print(f"⚠️ Error al guardar modelo actualizado: {save_err}")
+        except Exception as err:
+            print(f"⚠️ Error durante el entrenamiento de TF por refuerzo: {err}")
+
+    return {
+        "exito": True,
+        "mensaje": f"🧠 Aprendizaje por refuerzo aplicado exitosamente. La flor fue memorizada y corregida a {especie_norm}.",
+        "loss": loss_val,
+        "muestra_guardada": ruta_img
+    }
+
 

@@ -4,6 +4,7 @@ import datetime
 import sys
 import os
 import numpy as np
+import textwrap
 
 # ---------------------------------------------------------------------------
 # CONFIGURACIÓN DE LA PÁGINA (¡Debe ser la primerísima línea!)
@@ -32,13 +33,55 @@ if _CAPTURE_DIR not in sys.path:
     sys.path.insert(0, _CAPTURE_DIR)
 
 try:
-    from analisis_imagen import analizar_marchitamiento, convertir_a_probabilidades, clasificar_flor_ia, hex_a_rangos_hsv
+    from analisis_imagen import (
+        analizar_marchitamiento,
+        convertir_a_probabilidades,
+        clasificar_flor_ia,
+        hex_a_rangos_hsv,
+        aprender_por_refuerzo,
+    )
     VISION_DISPONIBLE = True
 except ImportError:
     VISION_DISPONIBLE = False
 
     def hex_a_rangos_hsv(hex_str: str) -> dict:
         return {"h_min": 20, "h_max": 85, "s_min": 50, "s_max": 255, "v_min": 50, "v_max": 255}
+
+import base64
+
+def matriz_a_base64(imagen_np: np.ndarray, max_dim: int = 350) -> str:
+    """Convierte un ndarray BGR/RGB de OpenCV a string Data URL Base64 para HTML/Card."""
+    if imagen_np is None or imagen_np.size == 0:
+        return ""
+    try:
+        if len(imagen_np.shape) == 3 and imagen_np.shape[2] == 4:
+            img_bgr = cv2.cvtColor(imagen_np, cv2.COLOR_RGBA2BGR)
+        elif len(imagen_np.shape) == 3 and imagen_np.shape[2] == 3:
+            img_bgr = cv2.cvtColor(imagen_np, cv2.COLOR_RGB2BGR) if imagen_np.dtype == np.uint8 else imagen_np
+        else:
+            img_bgr = imagen_np
+
+        h, w = img_bgr.shape[:2]
+        if max(h, w) > max_dim:
+            scale = max_dim / float(max(h, w))
+            img_bgr = cv2.resize(img_bgr, (int(w * scale), int(h * scale)))
+
+        _, buffer = cv2.imencode('.jpg', img_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        b64_str = base64.b64encode(buffer).decode('utf-8')
+        return f"data:image/jpeg;base64,{b64_str}"
+    except Exception as e:
+        print(f"⚠️ Error convirtiendo matriz a base64: {e}")
+        return ""
+
+IMAGENES_DEMO_FLORES = {
+    "Rosa": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80",
+    "Orquídea": "https://images.unsplash.com/photo-1525310072745-f49212b5ac6d?auto=format&fit=crop&w=400&q=80",
+    "Girasol": "https://images.unsplash.com/photo-1597848212624-a19eb35e2651?auto=format&fit=crop&w=400&q=80",
+    "Tulipán": "https://images.unsplash.com/photo-1520763185298-1b434c919102?auto=format&fit=crop&w=400&q=80",
+    "Margarita": "https://images.unsplash.com/photo-1606041008023-472dfb5e530f?auto=format&fit=crop&w=400&q=80",
+    "Clavel": "https://images.unsplash.com/photo-1582794543139-8ac9cb0f7b11?auto=format&fit=crop&w=400&q=80",
+    "Lirio": "https://images.unsplash.com/photo-1508610048659-a06b669e3321?auto=format&fit=crop&w=400&q=80",
+}
 
 from agentefloravision import AgenteFloraVision, PRECIOS_BASE
 
@@ -70,11 +113,20 @@ DATOS_INVENTARIO_DEMO = {
 }
 
 def _get_inventario():
-    """Retorna datos del agente si tiene historial, o los datos demo."""
+    """Retorna datos del agente si tiene historial, o estructura vacía si inicia desde 0."""
     agente = st.session_state.agente
     if agente.historial:
         return agente.inventario_agrupado()
-    return DATOS_INVENTARIO_DEMO
+    return {
+        "Planta": [],
+        "Cantidad": [],
+        "Estado": [],
+        "Precio": [],
+        "Descuento": [],
+        "PorcentajeMarchito": [],
+        "Imagen": [],
+        "Timestamp": [],
+    }
 
 # ---------------------------------------------------------------------------
 # CSS GLOBAL (Réplica exacta de tu Mockup)
@@ -99,23 +151,34 @@ st.markdown(
         }}
 
         /* LOGO INTERACTIVO EN EL SIDEBAR */
-        div.stButton > button[key="btn_logo_home"] {{
-            background: transparent !important;
-            border: none !important;
-            padding: 0 !important;
+        .logo-btn-container div.stButton > button {{
+            background-color: white !important;
+            border: 2px solid {CARD_BORDER} !important;
+            border-radius: 25px !important;
+            padding: 0.5rem 1.2rem !important;
             width: 100% !important;
-            text-align: left !important;
-            box-shadow: none !important;
-            display: block !important;
+            text-align: center !important;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.04) !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease-in-out !important;
+            margin-bottom: 0.5rem !important;
+        }}
+        .logo-btn-container div.stButton > button:hover {{
+            background-color: {CREAM} !important;
+            border-color: {MAROON} !important;
+            transform: translateY(-1px);
+        }}
+        .logo-btn-container div.stButton > button p,
+        .logo-btn-container p,
+        .floravision-logo p {{
+            color: {TEXT_MAROON} !important;
+            -webkit-text-fill-color: {TEXT_MAROON} !important;
             font-family: 'Montserrat', sans-serif !important;
-            font-size: 2.3rem !important;
+            font-size: 1.8rem !important;
             font-weight: 800 !important;
             letter-spacing: -0.5px !important;
-            line-height: 1.1 !important;
-            cursor: pointer !important;
-            background: linear-gradient(90deg, {PINK} 0%, {PINK} 43%, {GOLD} 43%, {GOLD} 100%) !important;
-            -webkit-background-clip: text !important;
-            -webkit-text-fill-color: transparent !important;
+            line-height: 1.2 !important;
+            margin: 0 !important;
         }}
         
         .brand-underline {{
@@ -207,11 +270,17 @@ st.markdown(
             color: #FFFFFF !important;
         }}
 
-        /* Excepción en barra lateral: las pastillas blancas del menú (st.radio) llevan texto oscuro */
+        /* Excepción en barra lateral: Logo FloraVision y pastillas del menú con texto oscuro */
         div[data-testid="stRadio"] label p,
         div[data-testid="stRadio"] label span,
-        div[data-testid="stRadio"] label div {{
+        div[data-testid="stRadio"] label div,
+        .logo-btn-container p,
+        .logo-btn-container div.stButton > button p,
+        .logo-btn-container div.stButton > button span,
+        .floravision-logo,
+        .floravision-logo p {{
             color: {TEXT_MAROON} !important;
+            -webkit-text-fill-color: {TEXT_MAROON} !important;
             font-weight: bold !important;
         }}
 
@@ -353,7 +422,9 @@ def cambiar_modulo():
 # MENÚ EN LA BARRA LATERAL (SIDEBAR)
 # ---------------------------------------------------------------------------
 with st.sidebar:
+    st.markdown('<div class="logo-btn-container">', unsafe_allow_html=True)
     st.button("FloraVision", key="btn_logo_home", on_click=ir_a_inicio)
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="brand-underline"></div>', unsafe_allow_html=True)
 
     opciones_menu = ["Inicio", "Detección", "Entrenamiento IA", "Inventario", "Dashboard"]
@@ -739,10 +810,12 @@ def render_deteccion():
             pct_marchito = pct_preview
 
             probs = convertir_a_probabilidades(pct_marchito)
-            resultado_agente = agente.percibir(tipo_evaluado.lower(), probs, cantidad=1)
+            img_b64 = matriz_a_base64(imagen_np)
+            resultado_agente = agente.percibir(tipo_evaluado.lower(), probs, cantidad=1, imagen_b64=img_b64)
             if resultado_agente:
                 resultado_agente["porcentaje_marchito"] = pct_marchito
                 resultado_agente["resultado_ia"] = res_ia
+                resultado_agente["imagen_np"] = imagen_np
                 st.session_state.ultimo_resultado = resultado_agente
                 st.rerun()
 
@@ -765,13 +838,14 @@ def render_deteccion():
 
             # Si el modelo de IA está activo, mostrar tarjeta con la predicción de especie y confianza
             if res_ia.get("modelo_activo"):
-                st.markdown(f"""
+                badge_corregido = " <span style='background:#C9A227; color:#5C0030; font-size:0.75rem; padding:2px 8px; border-radius:10px;'>🧠 Corregido por Refuerzo</span>" if res_ia.get("corregido_por_refuerzo") else ""
+                st.markdown(textwrap.dedent(f"""
                 <div style="background: linear-gradient(135deg, {MAROON} 0%, {MAROON_DARK} 100%); color: white; padding: 14px 20px; border-radius: 12px; margin-top: 6px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(92,0,48,0.25);">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
                             <span style="font-size:0.78rem; letter-spacing:1px; opacity:0.9; text-transform:uppercase; color:#E2DFDF;">&#129302; Modelo IA (MobileNetV2 / Transfer Learning)</span>
                             <div style="font-family:'Montserrat',sans-serif; font-size:1.35rem; font-weight:800; color:#FFFFFF; text-shadow:0px 2px 4px rgba(0,0,0,0.3); margin-top:3px;">
-                                Especie Detectada por IA: <span style="color:#FFE87C;">{res_ia.get('especie')}</span>
+                                Especie Detectada por IA: <span style="color:#FFE87C;">{res_ia.get('especie')}</span>{badge_corregido}
                             </div>
                         </div>
                         <div style="text-align:right;">
@@ -780,7 +854,7 @@ def render_deteccion():
                         </div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """), unsafe_allow_html=True)
 
             badge_color_map = {
                 "Saludable": ("#E6F4EA", "#137333"),
@@ -836,136 +910,381 @@ def render_deteccion():
             )
             st.caption(f"Analisis realizado a las {ts}")
 
+            # ------------------------------------------------------------------
+            # SECCIÓN DE APRENDIZAJE POR REFUERZO / CORRECCIÓN DE PREDICCIÓN
+            # ------------------------------------------------------------------
+            st.markdown('<div style="margin-top:16px;"></div>', unsafe_allow_html=True)
+            with st.expander("🧠 ¿Predicción incorrecta / La IA se equivocó? Corregir y Entrenar por Refuerzo", expanded=False):
+                st.markdown(
+                    f'<div style="font-size:0.88rem; color:{TEXT_MAROON}; margin-bottom:8px;">'
+                    'Si la IA predijo una flor equivocada, selecciona la especie real. El sistema aplicará '
+                    '<b>Aprendizaje por Refuerzo (Reinforcement Fine-Tuning)</b> para actualizar inmediatamente '
+                    'los pesos del modelo y recalcular los precios del inventario sin ingresar malas predicciones.</div>',
+                    unsafe_allow_html=True
+                )
+                c_corr1, c_corr2 = st.columns([1.5, 1])
+                with c_corr1:
+                    especies_disp = ["Rosa", "Girasol", "Margarita", "Clavel", "Lirio", "Orquídea", "Tulipán"]
+                    idx_def = especies_disp.index(tipo.capitalize()) if tipo.capitalize() in especies_disp else 0
+                    especie_corregida = st.selectbox(
+                        "Selecciona la especie correcta:",
+                        especies_disp,
+                        index=idx_def,
+                        key="sel_especie_correcta"
+                    )
+                with c_corr2:
+                    st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
+                    btn_refuerzo = st.button("🧠 Aplicar Refuerzo y Corregir", key="btn_aplica_refuerzo", use_container_width=True)
+
+                if btn_refuerzo and "imagen_np" in res:
+                    with st.spinner("Ejecutando actualización por refuerzo del modelo de IA..."):
+                        resultado_refuerzo = aprender_por_refuerzo(res["imagen_np"], especie_corregida)
+                        
+                        nuevas_probs = convertir_a_probabilidades(pct)
+                        nuevo_res = agente.percibir(
+                            especie_corregida.lower(),
+                            nuevas_probs,
+                            cantidad=1,
+                            imagen_b64=res.get("imagen_b64")
+                        )
+                        if nuevo_res:
+                            nuevo_res["porcentaje_marchito"] = pct
+                            nuevo_res["resultado_ia"] = {
+                                "modelo_activo": True,
+                                "especie": especie_corregida,
+                                "confianza": 100.0,
+                                "corregido_por_refuerzo": True
+                            }
+                            nuevo_res["imagen_np"] = res["imagen_np"]
+                            agente.registrar_feedback(
+                                res_ia.get("especie", "Desconocida"),
+                                especie_corregida,
+                                loss=resultado_refuerzo.get("loss", 0.0)
+                            )
+                            st.session_state.ultimo_resultado = nuevo_res
+                            st.toast(f"🧠 ¡Refuerzo exitoso! Flor corregida a {especie_corregida}")
+                            st.success(f"✅ {resultado_refuerzo.get('mensaje')}")
+                            st.rerun()
+
             st.markdown('<div style="margin-top:14px;"></div>', unsafe_allow_html=True)
-            col_b1, col_b2 = st.columns([1.2, 1])
+            col_b1, col_b2, col_b3 = st.columns([1.2, 1.2, 1])
             with col_b1:
                 if st.button("➕ Agregar al Inventario", key="btn_add_inv", use_container_width=True):
                     st.session_state.agente.actuar(res)
                     st.success(f"✅ {tipo} ({estado}) guardada en el inventario.")
                     st.toast(f"🌸 {tipo} añadida al inventario")
             with col_b2:
-                if st.button("🔄 Nueva deteccion", key="btn_reset", use_container_width=True):
+                if st.button("🚫 Descartar Mala Predicción", key="btn_discard", use_container_width=True):
+                    st.session_state.ultimo_resultado = None
+                    st.toast("❌ Predicción descartada — No se incluyó en el inventario")
+                    st.rerun()
+            with col_b3:
+                if st.button("🔄 Nueva Detección", key="btn_reset", use_container_width=True):
                     st.session_state.ultimo_resultado = None
                     st.rerun()
 
 
+def normalizar_especie_y_foto(tipo_raw: str, imagen_b64: str | None = None) -> tuple[str, str]:
+    """
+    Normaliza nombres de especies con errores o plurales (ej. 'erosa' -> 'Rosa', 'girasoles' -> 'Girasol')
+    y garantiza una URL/Base64 de foto 100% válida sin romper el layout gráfico.
+    """
+    clean = tipo_raw.strip().lower() if tipo_raw else "rosa"
+    mapeo = {
+        "erosa": "Rosa",
+        "rosa": "Rosa",
+        "rosas": "Rosa",
+        "girasol": "Girasol",
+        "girasoles": "Girasol",
+        "margarita": "Margarita",
+        "margaritas": "Margarita",
+        "clavel": "Clavel",
+        "claveles": "Clavel",
+        "lirio": "Lirio",
+        "lirios": "Lirio",
+        "orquidea": "Orquídea",
+        "orquídea": "Orquídea",
+        "orquideas": "Orquídea",
+        "tulipan": "Tulipán",
+        "tulipán": "Tulipán",
+        "tulipanes": "Tulipán",
+    }
+    especie_norm = mapeo.get(clean, tipo_raw.strip().capitalize() if tipo_raw else "Rosa")
+
+    if imagen_b64 and isinstance(imagen_b64, str) and imagen_b64.startswith("data:image"):
+        foto_url = imagen_b64
+    else:
+        foto_url = IMAGENES_DEMO_FLORES.get(especie_norm, IMAGENES_DEMO_FLORES["Rosa"])
+
+    return especie_norm, foto_url
+
+
 def render_inventario():
-    st.markdown('<div class="section-title">Inventario</div>', unsafe_allow_html=True)
-    
-    # Construir tabla HTML/CSS personalizada (sin espacios al inicio para evitar que markdown lo interprete como código)
-    html_tabla = f"""<style>
-.custom-table-container {{
-    background-color: white;
-    border: 12px solid {CARD_BORDER};
-    border-radius: 24px;
-    padding: 30px 40px;
-    box-shadow: 0px 10px 30px rgba(0,0,0,0.04);
-    margin-top: 10px;
-}}
-.custom-table {{
-    width: 100%;
-    border-collapse: collapse;
-    font-family: 'Georgia', serif;
-    color: {BLANCO_TABLA};
-    font-size: 1.1rem;
-}}
-.custom-table th {{
-    background-color: {MAROON};
-    color: {BLANCO_TABLA};
-    padding: 14px 20px;
-    text-align: left;
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
-}}
-.custom-table th:first-child {{
-    border-top-left-radius: 12px;
-    border-bottom-left-radius: 12px;
-}}
-.custom-table th:last-child {{
-    border-top-right-radius: 12px;
-    border-bottom-right-radius: 12px;
-}}
-.custom-table td {{
-    padding: 18px 20px;
-    border-bottom: 1px solid {TRACK_GREY};
-}}
-.custom-table tr:last-child td {{
-    border-bottom: none;
-}}
-.badge {{
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 0.85rem;
-    display: inline-block;
-}}
-.badge-saludable {{
-    background-color: #E6F4EA;
-    color: #137333;
-}}
-.badge-riesgo {{
-    background-color: #FEF7E0;
-    color: #B06000;
-}}
-.badge-enferma {{
-    background-color: #FCE8E6;
-    color: #C5221F;
-}}
-</style>
-<div class="custom-table-container">
-    <table class="custom-table">
-        <thead>
-            <tr>
-                <th>Planta</th>
-                <th>Cantidad</th>
-                <th>Estado</th>
-            </tr>
-        </thead>
-        <tbody>"""
-    
-    datos = _get_inventario()
-    tiene_precio = "Precio" in datos
+    col_t1, col_t2 = st.columns([3, 1])
+    with col_t1:
+        st.markdown('<div class="section-title">Inventario Floral Categorizado por Especie</div>', unsafe_allow_html=True)
+    with col_t2:
+        st.markdown('<div style="margin-top:6px;"></div>', unsafe_allow_html=True)
+        if st.button("🗑️ Vaciar Inventario", key="btn_clear_all_inv", use_container_width=True):
+            st.session_state.agente.vaciar_inventario()
+            st.toast("🗑️ Inventario y base de datos reiniciados a 0")
+            st.rerun()
 
-    for i in range(len(datos["Planta"])):
-        planta  = datos["Planta"][i]
-        cantidad = datos["Cantidad"][i]
-        estado  = datos["Estado"][i]
+    st.markdown(
+        f'<div style="font-size:0.92rem; color:{TEXT_MAROON}; margin-bottom:18px;">'
+        'Cada especie floral cuenta con su apartado propio. Presiona en cualquier flor para desplegar sus '
+        '<b>divisiones de stock según su estado de salud (🟢 Sanas, 🟡 En Riesgo o 🔴 Enfermas)</b>.</div>',
+        unsafe_allow_html=True
+    )
 
-        if estado == "Saludable":
-            badge_class = "badge-saludable"
-        elif estado == "Riesgo":
-            badge_class = "badge-riesgo"
+    agente = st.session_state.agente
+    raw_entries = agente.historial
+
+    if not raw_entries:
+        st.info("📦 **El inventario se encuentra actualmente vacío (0 tallos).**\n\nAnaliza o escanea flores en la pestaña de **Detección** y presiona **'➕ Agregar al Inventario'** para registrar stock real.")
+        return
+
+    # Agrupar por especie normalizada
+    especies_dict: dict[str, dict] = {}
+    for entrada in raw_entries:
+        raw_flor = entrada.get("tipo_flor", "Rosa")
+        especie_norm, foto_url = normalizar_especie_y_foto(raw_flor, entrada.get("imagen_b64"))
+
+        if especie_norm not in especies_dict:
+            especies_dict[especie_norm] = {
+                "nombre": especie_norm,
+                "foto_url": foto_url,
+                "total_tallos": 0,
+                "saludables": [],
+                "riesgo": [],
+                "enfermas": [],
+            }
+
+        if entrada.get("imagen_b64") and isinstance(entrada["imagen_b64"], str) and entrada["imagen_b64"].startswith("data:image"):
+            especies_dict[especie_norm]["foto_url"] = entrada["imagen_b64"]
+
+        cant = entrada.get("cantidad", 1)
+        especies_dict[especie_norm]["total_tallos"] += cant
+
+        badge = entrada.get("badge", "Saludable")
+        if badge == "Saludable":
+            especies_dict[especie_norm]["saludables"].append(entrada)
+        elif badge == "Riesgo":
+            especies_dict[especie_norm]["riesgo"].append(entrada)
         else:
-            badge_class = "badge-enferma"
+            especies_dict[especie_norm]["enfermas"].append(entrada)
 
-        precio_td = ""
-        if tiene_precio:
-            desc = datos["Descuento"][i]
-            pf   = datos["Precio"][i]
-            precio_td = f'<td>RD$ {pf:.2f}' + (f' <small>(-{desc}%)</small>' if desc > 0 else '') + '</td>'
-
-        html_tabla += f"""
-<tr>
-<td style="font-weight: bold;">{planta}</td>
-<td>{cantidad} unidades</td>
-<td><span class="badge {badge_class}">{estado}</span></td>
-{precio_td}
-</tr>"""
-
-    html_tabla += """
-</tbody>
-</table>
-</div>"""
-    # Agregar columna Precio al thead si hay datos reales
-    if tiene_precio:
-        html_tabla = html_tabla.replace(
-            "<th>Estado</th>\n            </tr>",
-            "<th>Estado</th>\n                <th>Precio Final</th>\n            </tr>",
+    # ------------------------------------------------------------------
+    # BARRA DE FILTROS INTERACTIVOS POR ESPECIE Y ESTADO
+    # ------------------------------------------------------------------
+    with st.container():
+        st.markdown(
+            f'<div style="background-color:white; border:2px solid {CARD_BORDER}; border-radius:18px; padding:18px 24px; margin-bottom:20px; box-shadow:0 4px 14px rgba(0,0,0,0.04);">'
+            f'<div style="font-family:\'Georgia\',serif; font-weight:bold; font-size:1.1rem; color:{TEXT_MAROON}; margin-bottom:12px;">'
+            '🎛️ Filtros de Categorías Florales</div>',
+            unsafe_allow_html=True
         )
-    st.markdown(html_tabla, unsafe_allow_html=True)
+        col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 1])
+        with col_f1:
+            filtro_busqueda = st.text_input("🌸 Buscar por Nombre de Flor", placeholder="ej. Rosa, Girasol...", key="inv_cat_busqueda")
+        with col_f2:
+            filtro_estado = st.selectbox("🔍 Filtrar por Presencia de Estado", ["Todas las Flores", "Con Sanas 🟢", "Con Riesgo 🟡", "Con Enfermas 🔴"], key="inv_cat_estado")
+        with col_f3:
+            st.markdown('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
+            if st.button("🔄 Expandir / Colapsar Todo", key="btn_toggle_expand", use_container_width=True):
+                st.session_state.expandir_todo = not st.session_state.get("expandir_todo", False)
+
+    # Filtrar especies
+    especies_filtradas = {}
+    for esp_nombre, esp_datos in especies_dict.items():
+        if filtro_busqueda.strip() and filtro_busqueda.strip().lower() not in esp_nombre.lower():
+            continue
+        if filtro_estado == "Con Sanas 🟢" and not esp_datos["saludables"]:
+            continue
+        if filtro_estado == "Con Riesgo 🟡" and not esp_datos["riesgo"]:
+            continue
+        if filtro_estado == "Con Enfermas 🔴" and not esp_datos["enfermas"]:
+            continue
+        especies_filtradas[esp_nombre] = esp_datos
+
+    st.markdown(
+        f'<div style="font-size:0.95rem; color:{TEXT_MAROON}; font-weight:bold; margin-bottom:16px;">'
+        f'Mostrando {len(especies_filtradas)} categoría(s) de flores registradas</div>',
+        unsafe_allow_html=True
+    )
+
+    if not especies_filtradas:
+        st.warning("⚠️ No se encontraron especies que coincidan con los filtros.")
+        return
+
+    img_fallback_default = IMAGENES_DEMO_FLORES["Rosa"]
+    expand_state = st.session_state.get("expandir_todo", False)
+
+    # ------------------------------------------------------------------
+    # SECCIONES POR CADA ESPECIE DE FLOR Y SUS SUBDIVISIONES INTERNAS
+    # ------------------------------------------------------------------
+    for esp_nombre, esp_datos in especies_filtradas.items():
+        sanas_count = sum(it.get("cantidad", 1) for it in esp_datos["saludables"])
+        riesgo_count = sum(it.get("cantidad", 1) for it in esp_datos["riesgo"])
+        enfermas_count = sum(it.get("cantidad", 1) for it in esp_datos["enfermas"])
+        total_count = esp_datos["total_tallos"]
+        foto_src = esp_datos["foto_url"]
+
+        iconos_flor = {
+            "Rosa": "🌹", "Girasol": "🌻", "Orquídea": "🌸",
+            "Tulipán": "🌷", "Margarita": "🌼", "Clavel": "🌺", "Lirio": "🪷"
+        }
+        icon_f = iconos_flor.get(esp_nombre, "🌸")
+
+        with st.container():
+            html_especie_card = f"""
+            <div style="background-color:white; border:2px solid {CARD_BORDER}; border-radius:20px; padding:18px 24px; margin-top:14px; box-shadow:0 6px 16px rgba(0,0,0,0.05);">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <img src="{foto_src}" 
+                             onerror="this.onerror=null; this.src='{img_fallback_default}';" 
+                             style="width:85px; height:85px; object-fit:cover; border-radius:16px; border:2px solid {MAROON}; box-shadow:0 4px 10px rgba(0,0,0,0.08);" />
+                        <div>
+                            <div style="font-family:'Georgia',serif; font-size:1.5rem; font-weight:bold; color:{TEXT_MAROON};">
+                                {icon_f} Apartado de {esp_nombre}
+                            </div>
+                            <div style="font-size:0.88rem; color:#555; margin-top:2px;">
+                                Total acumulado en inventario: <b>{total_count} tallo(s)</b>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <span style="background:#E6F4EA; color:#137333; padding:6px 14px; border-radius:16px; font-weight:bold; font-size:0.85rem; border:1px solid #C3E6CB;">
+                            🟢 {sanas_count} Sanas
+                        </span>
+                        <span style="background:#FEF7E0; color:#B06000; padding:6px 14px; border-radius:16px; font-weight:bold; font-size:0.85rem; border:1px solid #FFEBAA;">
+                            🟡 {riesgo_count} En Riesgo
+                        </span>
+                        <span style="background:#FCE8E6; color:#C5221F; padding:6px 14px; border-radius:16px; font-weight:bold; font-size:0.85rem; border:1px solid #F5C6CB;">
+                            🔴 {enfermas_count} Enfermas
+                        </span>
+                    </div>
+                </div>
+            </div>
+            """
+            st.markdown(textwrap.dedent(html_especie_card), unsafe_allow_html=True)
+
+            # DESPLEGABLE CON LAS SUBDIVISIONES DE SALUD
+            with st.expander(f"🔽 Presiona para ver las divisiones de estado (Sanas / Enfermas) de {esp_nombre}", expanded=expand_state):
+                col_sub1, col_sub2, col_sub3 = st.columns(3)
+
+                # 🟢 DIVISION 1: SANAS
+                with col_sub1:
+                    st.markdown(
+                        textwrap.dedent(f"""
+                        <div style="background:#F4FAF6; border:2px solid #A8DADC; border-radius:16px; padding:14px 16px; height:100%;">
+                            <div style="font-family:'Georgia',serif; font-size:1.1rem; font-weight:bold; color:#137333; margin-bottom:8px;">
+                                🟢 Division: Sanas ({sanas_count} uds)
+                            </div>
+                        """),
+                        unsafe_allow_html=True
+                    )
+                    if esp_datos["saludables"]:
+                        for item in esp_datos["saludables"]:
+                            st.markdown(
+                                textwrap.dedent(f"""
+                                <div style="background:white; border-radius:12px; padding:12px; margin-bottom:8px; border:1px solid #C3E6CB; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                                    <div style="font-weight:bold; color:{TEXT_MAROON}; font-size:0.95rem;">
+                                        Precio Normal: RD$ {item.get('precio_final', 50.0):.2f}
+                                    </div>
+                                    <div style="font-size:0.82rem; color:#444; margin-top:2px;">
+                                        📦 Cantidad: <b>{item.get('cantidad', 1)} tallo(s)</b>
+                                    </div>
+                                    <div style="font-size:0.8rem; color:#137333; margin-top:2px;">
+                                        Deterioro: {item.get('porcentaje_marchito', 0.0):.1f}% (Excelente)
+                                    </div>
+                                    <div style="font-size:0.75rem; color:#777; text-align:right; margin-top:4px;">
+                                        🕒 {item.get('timestamp', '--:--')}
+                                    </div>
+                                </div>
+                                """),
+                                unsafe_allow_html=True
+                            )
+                    else:
+                        st.caption("No hay stock en estado sano actualmente.")
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                # 🟡 DIVISION 2: RIESGO
+                with col_sub2:
+                    st.markdown(
+                        textwrap.dedent(f"""
+                        <div style="background:#FFFDF0; border:2px solid #FFE082; border-radius:16px; padding:14px 16px; height:100%;">
+                            <div style="font-family:'Georgia',serif; font-size:1.1rem; font-weight:bold; color:#B06000; margin-bottom:8px;">
+                                🟡 Division: En Riesgo ({riesgo_count} uds)
+                            </div>
+                        """),
+                        unsafe_allow_html=True
+                    )
+                    if esp_datos["riesgo"]:
+                        for item in esp_datos["riesgo"]:
+                            st.markdown(
+                                textwrap.dedent(f"""
+                                <div style="background:white; border-radius:12px; padding:12px; margin-bottom:8px; border:1px solid #FFE58F; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                                    <div style="font-weight:bold; color:#B06000; font-size:0.95rem;">
+                                        Precio con Descuento: RD$ {item.get('precio_final', 40.0):.2f}
+                                    </div>
+                                    <div style="font-size:0.82rem; color:#444; margin-top:2px;">
+                                        📦 Cantidad: <b>{item.get('cantidad', 1)} tallo(s)</b>
+                                    </div>
+                                    <div style="font-size:0.8rem; color:#B06000; margin-top:2px;">
+                                        Descuento Aplicado: <b>{item.get('descuento', 20)}% OFF</b>
+                                    </div>
+                                    <div style="font-size:0.8rem; color:#555;">
+                                        Deterioro: {item.get('porcentaje_marchito', 0.0):.1f}%
+                                    </div>
+                                    <div style="font-size:0.75rem; color:#B06000; font-weight:bold; margin-top:4px;">
+                                        ⚡ Recomendación: Vender hoy
+                                    </div>
+                                </div>
+                                """),
+                                unsafe_allow_html=True
+                            )
+                    else:
+                        st.caption("No hay plantas en estado de riesgo.")
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                # 🔴 DIVISION 3: ENFERMAS / PERDIDA
+                with col_sub3:
+                    st.markdown(
+                        textwrap.dedent(f"""
+                        <div style="background:#FFF5F5; border:2px solid #FFCDD2; border-radius:16px; padding:14px 16px; height:100%;">
+                            <div style="font-family:'Georgia',serif; font-size:1.1rem; font-weight:bold; color:#C5221F; margin-bottom:8px;">
+                                🔴 Division: Enfermas ({enfermas_count} uds)
+                            </div>
+                        """),
+                        unsafe_allow_html=True
+                    )
+                    if esp_datos["enfermas"]:
+                        for item in esp_datos["enfermas"]:
+                            st.markdown(
+                                textwrap.dedent(f"""
+                                <div style="background:white; border-radius:12px; padding:12px; margin-bottom:8px; border:1px solid #FFCDD2; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                                    <div style="font-weight:bold; color:#C5221F; font-size:0.95rem;">
+                                        Flor No Apta para Venta
+                                    </div>
+                                    <div style="font-size:0.82rem; color:#444; margin-top:2px;">
+                                        📦 Cantidad: <b>{item.get('cantidad', 1)} tallo(s)</b>
+                                    </div>
+                                    <div style="font-size:0.8rem; color:#C5221F; margin-top:2px;">
+                                        Deterioro: {item.get('porcentaje_marchito', 0.0):.1f}% (Marchita)
+                                    </div>
+                                    <div style="font-size:0.75rem; color:#C5221F; font-weight:bold; margin-top:4px;">
+                                        🚫 Acción: Retirar del inventario
+                                    </div>
+                                </div>
+                                """),
+                                unsafe_allow_html=True
+                            )
+                    else:
+                        st.caption("No hay plantas enfermas actualmente.")
+                    st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div style="margin-bottom:10px;"></div>', unsafe_allow_html=True)
 
 
 def render_dashboard():

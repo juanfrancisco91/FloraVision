@@ -62,23 +62,34 @@ st.markdown(
         }}
 
         /* LOGO INTERACTIVO EN EL SIDEBAR */
-        div.stButton > button[key="btn_logo_home"] {{
-            background: transparent !important;
-            border: none !important;
-            padding: 0 !important;
+        .logo-btn-container div.stButton > button {{
+            background-color: white !important;
+            border: 2px solid {CARD_BORDER} !important;
+            border-radius: 25px !important;
+            padding: 0.5rem 1.2rem !important;
             width: 100% !important;
-            text-align: left !important;
-            box-shadow: none !important;
-            display: block !important;
+            text-align: center !important;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.04) !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease-in-out !important;
+            margin-bottom: 0.5rem !important;
+        }}
+        .logo-btn-container div.stButton > button:hover {{
+            background-color: {CREAM} !important;
+            border-color: {MAROON} !important;
+            transform: translateY(-1px);
+        }}
+        .logo-btn-container div.stButton > button p,
+        .logo-btn-container p,
+        .floravision-logo p {{
+            color: {TEXT_MAROON} !important;
+            -webkit-text-fill-color: {TEXT_MAROON} !important;
             font-family: 'Montserrat', sans-serif !important;
-            font-size: 2.3rem !important;
+            font-size: 1.8rem !important;
             font-weight: 800 !important;
             letter-spacing: -0.5px !important;
-            line-height: 1.1 !important;
-            cursor: pointer !important;
-            background: linear-gradient(90deg, {PINK} 0%, {PINK} 43%, {GOLD} 43%, {GOLD} 100%) !important;
-            -webkit-background-clip: text !important;
-            -webkit-text-fill-color: transparent !important;
+            line-height: 1.2 !important;
+            margin: 0 !important;
         }}
         
         .brand-underline {{
@@ -223,7 +234,9 @@ def cambiar_modulo():
 # MENÚ EN LA BARRA LATERAL (SIDEBAR)
 # ---------------------------------------------------------------------------
 with st.sidebar:
+    st.markdown('<div class="logo-btn-container">', unsafe_allow_html=True)
     st.button("FloraVision", key="btn_logo_home", on_click=ir_a_inicio)
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="brand-underline"></div>', unsafe_allow_html=True)
 
     opciones_menu = ["Inicio", "Detección", "Inventario", "Dashboard"]
