@@ -74,13 +74,13 @@ def matriz_a_base64(imagen_np: np.ndarray, max_dim: int = 350) -> str:
         return ""
 
 IMAGENES_DEMO_FLORES = {
-    "Rosa": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80",
-    "Orquídea": "https://images.unsplash.com/photo-1525310072745-f49212b5ac6d?auto=format&fit=crop&w=400&q=80",
-    "Girasol": "https://images.unsplash.com/photo-1597848212624-a19eb35e2651?auto=format&fit=crop&w=400&q=80",
-    "Tulipán": "https://images.unsplash.com/photo-1520763185298-1b434c919102?auto=format&fit=crop&w=400&q=80",
-    "Margarita": "https://images.unsplash.com/photo-1606041008023-472dfb5e530f?auto=format&fit=crop&w=400&q=80",
-    "Clavel": "https://images.unsplash.com/photo-1582794543139-8ac9cb0f7b11?auto=format&fit=crop&w=400&q=80",
-    "Lirio": "https://images.unsplash.com/photo-1508610048659-a06b669e3321?auto=format&fit=crop&w=400&q=80",
+    "Rosa":     "https://images.unsplash.com/photo-1559563362-c667ba5f5480?auto=format&fit=crop&w=400&q=80",  # Rosa roja ✓
+    "Orquídea": "https://images.unsplash.com/photo-1566907225033-30b7e7f9ec0d?auto=format&fit=crop&w=400&q=80",  # Orquídea ✓
+    "Girasol":  "https://images.unsplash.com/photo-1597848212624-a19eb35e2651?auto=format&fit=crop&w=400&q=80",  # Girasol ✓
+    "Tulipán":  "https://images.unsplash.com/photo-1457296898342-cdd24585d095?auto=format&fit=crop&w=400&q=80",  # Tulipanes ✓
+    "Margarita":"https://images.unsplash.com/photo-1606041008023-472dfb5e530f?auto=format&fit=crop&w=400&q=80",  # Margarita ✓
+    "Clavel":   "https://images.unsplash.com/photo-1589994160839-163f4b26d962?auto=format&fit=crop&w=400&q=80",  # Clavel ✓
+    "Lirio":    "https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?auto=format&fit=crop&w=400&q=80",  # Lirio ✓
 }
 
 from agentefloravision import AgenteFloraVision, PRECIOS_BASE
@@ -168,12 +168,18 @@ st.markdown(
             border-color: {MAROON} !important;
             transform: translateY(-1px);
         }}
+        /* Forzar texto oscuro en el botón FloraVision usando data-testid de máxima especificidad */
+        [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] p,
+        [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
+        [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] div,
         .logo-btn-container div.stButton > button p,
+        .logo-btn-container div.stButton > button span,
+        .logo-btn-container div.stButton > button div,
         .logo-btn-container p,
         .floravision-logo p {{
             color: {TEXT_MAROON} !important;
             -webkit-text-fill-color: {TEXT_MAROON} !important;
-            font-family: 'Montserrat', sans-serif !important;
+            font-family: 'Georgia', serif !important;
             font-size: 1.8rem !important;
             font-weight: 800 !important;
             letter-spacing: -0.5px !important;
@@ -270,15 +276,10 @@ st.markdown(
             color: #FFFFFF !important;
         }}
 
-        /* Excepción en barra lateral: Logo FloraVision y pastillas del menú con texto oscuro */
+        /* Excepción en barra lateral: Pastillas del menú con texto oscuro */
         div[data-testid="stRadio"] label p,
         div[data-testid="stRadio"] label span,
-        div[data-testid="stRadio"] label div,
-        .logo-btn-container p,
-        .logo-btn-container div.stButton > button p,
-        .logo-btn-container div.stButton > button span,
-        .floravision-logo,
-        .floravision-logo p {{
+        div[data-testid="stRadio"] label div {{
             color: {TEXT_MAROON} !important;
             -webkit-text-fill-color: {TEXT_MAROON} !important;
             font-weight: bold !important;
@@ -341,12 +342,26 @@ st.markdown(
             font-weight: bold !important;
         }}
 
-        /* Selectbox y Dropdowns */
-        [data-testid="stSelectbox"] label,
-        [data-testid="stSelectbox"] div[data-baseweb="select"] span,
-        [data-testid="stSelectbox"] div[data-baseweb="select"] div {{
+        /* Selectbox y Dropdowns: Texto del valor en color claro (CREAM) */
+        [data-testid="stSelectbox"] label {{
             color: {TEXT_MAROON} !important;
             font-weight: 600 !important;
+        }}
+        [data-testid="stSelectbox"] div[data-baseweb="select"] {{
+            background-color: {MAROON} !important;
+            border-radius: 8px !important;
+        }}
+        [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] div,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] div[value],
+        div[data-baseweb="select"] div[value] {{
+            color: {CREAM} !important;
+            -webkit-text-fill-color: {CREAM} !important;
+            font-weight: 600 !important;
+        }}
+        [data-testid="stSelectbox"] div[data-baseweb="select"] svg {{
+            fill: {CREAM} !important;
+            color: {CREAM} !important;
         }}
         [role="listbox"] li, [role="option"] {{
             color: {TEXT_MAROON} !important;
@@ -366,10 +381,39 @@ st.markdown(
             border-color: {MAROON} !important;
         }}
 
-        /* 5. Forzar fondo blanco y borde en File Uploader */
+        /* Botón de la cámara (Take Photo) con texto claro (CREAM) */
+        button[data-testid="stCameraInputButton"],
+        button[data-testid="stCameraInputButton"] *,
+        [data-testid="stCameraInputButton"],
+        [data-testid="stCameraInputButton"] * {{
+            background-color: {MAROON} !important;
+            color: {CREAM} !important;
+            -webkit-text-fill-color: {CREAM} !important;
+            font-weight: bold !important;
+        }}
+        button[data-testid="stCameraInputButton"] svg {{
+            fill: {CREAM} !important;
+            color: {CREAM} !important;
+        }}
+
+        /* File Uploader Dropzone con texto claro (CREAM) */
         [data-testid="stFileUploaderDropzone"] {{
-            background-color: white !important;
+            background-color: {MAROON} !important;
             border: 2px dashed {CARD_BORDER} !important;
+            border-radius: 12px !important;
+        }}
+        [data-testid="stFileUploaderDropzone"] p,
+        [data-testid="stFileUploaderDropzone"] span,
+        [data-testid="stFileUploaderDropzone"] small,
+        [data-testid="stFileUploaderDropzone"] div,
+        [data-testid="stFileUploaderDropzone"] button,
+        [data-testid="stFileUploaderDropzone"] label {{
+            color: {CREAM} !important;
+            -webkit-text-fill-color: {CREAM} !important;
+        }}
+        [data-testid="stFileUploaderDropzone"] svg {{
+            fill: {CREAM} !important;
+            color: {CREAM} !important;
         }}
 
         .main-section-title {{
@@ -400,6 +444,50 @@ st.markdown(
         }}
         .dashboard-box-light * {{
             color: {TEXT_MAROON} !important;
+        }}
+
+        /* EXPANDERS (st.expander): Fondo oscuro bordó y texto claro en el resumen/título del acordeón */
+        [data-testid="stExpander"],
+        details {{
+            background-color: {MAROON} !important;
+            border: 2px solid {CARD_BORDER} !important;
+            border-radius: 16px !important;
+            overflow: hidden !important;
+            margin-bottom: 1rem !important;
+        }}
+        [data-testid="stExpander"] summary,
+        details summary {{
+            background-color: {MAROON} !important;
+            border-radius: 14px !important;
+            padding: 0.75rem 1rem !important;
+            cursor: pointer !important;
+            transition: background-color 0.2s ease !important;
+        }}
+        [data-testid="stExpander"] summary:hover,
+        details summary:hover {{
+            background-color: #7A0040 !important;
+        }}
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary p,
+        [data-testid="stExpander"] summary span,
+        [data-testid="stExpander"] summary div,
+        [data-testid="stExpander"] summary svg,
+        details summary,
+        details summary p,
+        details summary span,
+        details summary div,
+        details summary svg {{
+            color: {CREAM} !important;
+            -webkit-text-fill-color: {CREAM} !important;
+            font-weight: 600 !important;
+        }}
+        [data-testid="stExpander"] summary [data-testid="stIconMaterial"],
+        details summary [data-testid="stIconMaterial"],
+        [data-testid="stExpander"] summary svg path,
+        details summary svg path {{
+            color: {CREAM} !important;
+            fill: {CREAM} !important;
+            -webkit-text-fill-color: {CREAM} !important;
         }}
     </style>
     """,
@@ -530,7 +618,6 @@ def render_deteccion():
     st.markdown('<div class="section-title">Deteccion Inteligente</div>', unsafe_allow_html=True)
 
     agente = st.session_state.agente
-    flores_disponibles = [f.capitalize() for f in list(PRECIOS_BASE.keys())]
 
     # ------------------------------------------------------------------
     # COLUMNA IZQUIERDA: Controles (replica los trackbars de cv_taskbar.py)
@@ -539,32 +626,18 @@ def render_deteccion():
 
     with col_ctrl:
         with st.container(border=True):
-            st.markdown(f'<div style="font-family:Georgia,serif;font-weight:bold;font-size:1rem;color:{TEXT_MAROON};margin-bottom:4px;">Tipo de Flor</div>', unsafe_allow_html=True)
-            st.caption("&#129302; La IA identificará la flor automáticamente al cargar la foto. También puedes seleccionarla manualmente.")
-            tipo_flor = st.selectbox(
-                "Tipo de Flor",
-                flores_disponibles,
-                index=0,
-                key="selectbox_flor",
-                label_visibility="collapsed",
-            )
-
-            st.divider()
-
             # Rueda de colores automática en vez de 6 sliders HSV
             st.markdown(f'<div style="font-family:Georgia,serif;font-weight:bold;font-size:1rem;color:{TEXT_MAROON};margin-bottom:4px;">Color de la Flor (Pétalos Sanos)</div>', unsafe_allow_html=True)
             st.caption("Toca el círculo para elegir el color exacto. El sistema calibrará los parámetros de detección automáticamente.")
 
-            if "color_seleccionado" not in st.session_state:
-                st.session_state.color_seleccionado = "#E60000"
             if "cp_flor" not in st.session_state:
-                st.session_state["cp_flor"] = st.session_state.color_seleccionado
+                st.session_state["cp_flor"] = "#E60000"
+            st.session_state.color_seleccionado = st.session_state["cp_flor"]
 
             col_picker, col_info = st.columns([1, 2.2])
             with col_picker:
                 color_elegido = st.color_picker(
                     "Seleccionar color",
-                    value=st.session_state.color_seleccionado,
                     key="cp_flor",
                     label_visibility="collapsed",
                 )
@@ -588,8 +661,8 @@ def render_deteccion():
             ]
 
             def _cb_aplicar_preset(hex_val):
-                st.session_state.color_seleccionado = hex_val
                 st.session_state["cp_flor"] = hex_val
+                st.session_state.color_seleccionado = hex_val
 
             for col_p, (label, hex_val, key_p) in zip(preset_cols, presets):
                 with col_p:
@@ -602,7 +675,7 @@ def render_deteccion():
                     )
 
             # Ajuste automático por detrás (rango HSV calculado en backend)
-            rangos = hex_a_rangos_hsv(st.session_state.color_seleccionado)
+            rangos = hex_a_rangos_hsv(color_elegido)
             h_min = rangos["h_min"]
             h_max = rangos["h_max"]
             s_min = rangos["s_min"]
@@ -799,12 +872,9 @@ def render_deteccion():
         with st.spinner("Procesando visión por computadora e inferencia con IA..."):
             res_ia = clasificar_flor_ia(imagen_np) if VISION_DISPONIBLE else {"modelo_activo": False}
 
-            # Si la IA identifica la flor con confianza > 40%, usamos esa especie automáticamente
-            tipo_evaluado = tipo_flor
-            if res_ia.get("modelo_activo") and res_ia.get("confianza", 0) > 40:
-                especie_ia = res_ia["especie"].lower()
-                if especie_ia in PRECIOS_BASE:
-                    tipo_evaluado = especie_ia
+            # Usar la especie identificada por el modelo de IA o fallback a "rosa"
+            especie_predicha = res_ia.get("especie", "Rosa") if res_ia.get("modelo_activo") else "Rosa"
+            tipo_evaluado = especie_predicha.lower() if especie_predicha.lower() in PRECIOS_BASE else "rosa"
 
             # Utilizar el porcentaje exacto ya calculado en la vista previa de OpenCV para garantizar consistencia 100%
             pct_marchito = pct_preview
@@ -916,7 +986,7 @@ def render_deteccion():
             st.markdown('<div style="margin-top:16px;"></div>', unsafe_allow_html=True)
             with st.expander("🧠 ¿Predicción incorrecta / La IA se equivocó? Corregir y Entrenar por Refuerzo", expanded=False):
                 st.markdown(
-                    f'<div style="font-size:0.88rem; color:{TEXT_MAROON}; margin-bottom:8px;">'
+                    f'<div style="font-size:0.88rem; color:{CREAM}; margin-bottom:8px;">'
                     'Si la IA predijo una flor equivocada, selecciona la especie real. El sistema aplicará '
                     '<b>Aprendizaje por Refuerzo (Reinforcement Fine-Tuning)</b> para actualizar inmediatamente '
                     'los pesos del modelo y recalcular los precios del inventario sin ingresar malas predicciones.</div>',
@@ -1558,7 +1628,7 @@ def render_entrenamiento():
                         "--sample-dataset"
                     ]
                     
-                    res = subprocess.run(cmd, capture_output=True, text=True)
+                    res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
                     if res.returncode == 0:
                         st.success("✅ ¡Modelo entrenado y exportado exitosamente a modelo_flores.h5 y modelo_flores.keras!")
                         import analisis_imagen

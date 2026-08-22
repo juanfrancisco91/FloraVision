@@ -13,6 +13,19 @@ Uso:
 
 import os
 import sys
+
+# Forzar codificación UTF-8 en stdout y stderr para evitar UnicodeEncodeError en Windows (CP1252)
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 import argparse
 from pathlib import Path
 import numpy as np
@@ -116,22 +129,39 @@ def construir_modelo_flores(model_type: str = "mobilenet", num_classes: int = le
     x = obtener_capa_data_augmentation()(inputs)
     
     # 2. Carga y Normalización del modelo preentrenado en ImageNet
-    if model_type.lower() == "resnet":
-        print("🏗️ Cargando modelo base: ResNet50 (preentrenado en ImageNet)...")
-        x = tf.keras.applications.resnet50.preprocess_input(x)
-        base_model = tf.keras.applications.ResNet50(
-            weights="imagenet",
-            include_top=False,
-            input_tensor=x
-        )
-    else:
-        print("🏗️ Cargando modelo base: MobileNetV2 (preentrenado en ImageNet)...")
-        x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
-        base_model = tf.keras.applications.MobileNetV2(
-            weights="imagenet",
-            include_top=False,
-            input_tensor=x
-        )
+    try:
+        if model_type.lower() == "resnet":
+            print("🏗️ Cargando modelo base: ResNet50 (preentrenado en ImageNet)...")
+            x = tf.keras.applications.resnet50.preprocess_input(x)
+            base_model = tf.keras.applications.ResNet50(
+                weights="imagenet",
+                include_top=False,
+                input_tensor=x
+            )
+        else:
+            print("🏗️ Cargando modelo base: MobileNetV2 (preentrenado en ImageNet)...")
+            x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
+            base_model = tf.keras.applications.MobileNetV2(
+                weights="imagenet",
+                include_top=False,
+                input_tensor=x
+            )
+    except Exception as err_weights:
+        print(f"⚠️ Detectado archivo de pesos corrupto o incompleto en caché ({err_weights}). Limpiando caché...")
+        keras_models_dir = Path.home() / ".keras" / "models"
+        if keras_models_dir.exists():
+            for f_h5 in keras_models_dir.glob("*.h5"):
+                try:
+                    f_h5.unlink()
+                except Exception:
+                    pass
+        print("🔄 Reintentando descarga limpia de los pesos del modelo...")
+        if model_type.lower() == "resnet":
+            x = tf.keras.applications.resnet50.preprocess_input(x)
+            base_model = tf.keras.applications.ResNet50(weights="imagenet", include_top=False, input_tensor=x)
+        else:
+            x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
+            base_model = tf.keras.applications.MobileNetV2(weights="imagenet", include_top=False, input_tensor=x)
 
     # Congelar capas del modelo preentrenado inicialmente
     base_model.trainable = False
@@ -162,9 +192,11 @@ def entrenar_modelo(dataset_dir: Path, model_type: str = "mobilenet", epochs: in
         
     print(f"📊 Cargando dataset desde: {dataset_dir}")
     
+    clases_target = [c.lower() for c in CLASES_FLORES]
     try:
         train_ds = tf.keras.utils.image_dataset_from_directory(
             dataset_dir,
+            class_names=clases_target,
             validation_split=0.2,
             subset="training",
             seed=123,
@@ -175,6 +207,7 @@ def entrenar_modelo(dataset_dir: Path, model_type: str = "mobilenet", epochs: in
 
         val_ds = tf.keras.utils.image_dataset_from_directory(
             dataset_dir,
+            class_names=clases_target,
             validation_split=0.2,
             subset="validation",
             seed=123,
@@ -187,11 +220,11 @@ def entrenar_modelo(dataset_dir: Path, model_type: str = "mobilenet", epochs: in
         print("🔄 Recreando dataset de muestra seguro...")
         preparar_dataset_muestra(dataset_dir)
         train_ds = tf.keras.utils.image_dataset_from_directory(
-            dataset_dir, validation_split=0.2, subset="training", seed=123,
+            dataset_dir, class_names=clases_target, validation_split=0.2, subset="training", seed=123,
             image_size=IMG_SIZE, batch_size=batch_size, label_mode="categorical"
         )
         val_ds = tf.keras.utils.image_dataset_from_directory(
-            dataset_dir, validation_split=0.2, subset="validation", seed=123,
+            dataset_dir, class_names=clases_target, validation_split=0.2, subset="validation", seed=123,
             image_size=IMG_SIZE, batch_size=batch_size, label_mode="categorical"
         )
 
